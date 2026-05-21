@@ -17,7 +17,7 @@ let canvasSize = 0;
 
 function resize(): void {
   const dpr = window.devicePixelRatio || 1;
-  const maxDim = Math.min(window.innerWidth, window.innerHeight) * 0.92;
+  const maxDim = Math.min(window.innerWidth, window.innerHeight) * 0.78;
   canvasSize = Math.floor(maxDim);
   const px = Math.floor(canvasSize * dpr);
   canvas.width = px;

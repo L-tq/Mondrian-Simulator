@@ -27,14 +27,13 @@ export function renderMondrian(
     }
   }
 
-  // Determine line thickness in pixels
+  // Line thickness in pixels
   const thinPx = Math.max(2, Math.min(cellW, cellH) * 0.18);
   const thickPx = thinPx * 2.8;
 
   ctx.fillStyle = COLORS.black;
 
   // Draw horizontal lines at the TOP boundary of each hLine cell
-  // This positions the line between the previous row and this row
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
       const cell = grid.get(r, c);
@@ -43,11 +42,7 @@ export function renderMondrian(
 
       const x = margin + c * cellW;
       const y = margin + r * cellH;
-
-      // Check if adjacent rows also have hLine (thick line)
-      const above = r > 0 && (grid.get(r - 1, c).kind === 'hLine' || grid.get(r - 1, c).kind === 'both');
-      const below = r < size - 1 && (grid.get(r + 1, c).kind === 'hLine' || grid.get(r + 1, c).kind === 'both');
-      const thick = above || below;
+      const thick = kind === 'both' ? cell.thickH : cell.thick;
       const barH = thick ? thickPx : thinPx;
 
       // Position bar so it straddles the top edge of this cell
@@ -65,12 +60,10 @@ export function renderMondrian(
 
       const x = margin + c * cellW;
       const y = margin + r * cellH;
-
-      const left = c > 0 && (grid.get(r, c - 1).kind === 'vLine' || grid.get(r, c - 1).kind === 'both');
-      const right = c < size - 1 && (grid.get(r, c + 1).kind === 'vLine' || grid.get(r, c + 1).kind === 'both');
-      const thick = left || right;
+      const thick = kind === 'both' ? cell.thickV : cell.thick;
       const barW = thick ? thickPx : thinPx;
 
+      // Position bar so it straddles the left edge of this cell
       const barX = x - barW / 2;
       ctx.fillRect(barX, y, barW, cellH);
     }
