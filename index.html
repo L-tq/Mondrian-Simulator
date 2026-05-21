@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mondrian Simulator</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="mondrian-canvas"></canvas>
+
+  <div id="controls">
+    <button id="btn-generate">Generate</button>
+    <label class="control-group">
+      <span>Grid</span>
+      <input type="range" id="grid-size" min="12" max="24" value="16" step="1" />
+      <span id="grid-size-label">16</span>
+    </label>
+    <label class="control-group">
+      <span>Color</span>
+      <input type="range" id="color-intensity" min="0" max="100" value="50" step="1" />
+      <span id="color-intensity-label">50</span>
+    </label>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
