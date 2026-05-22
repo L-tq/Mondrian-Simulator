@@ -27,6 +27,20 @@ npm run dev      # http://localhost:5173
 - **Grid** slider — grid density (12–24)
 - **Color** slider — color saturation (0–100%)
 
+## Debug mode
+
+Append `?debug=1` to the URL and open the browser console. The grid is printed as ASCII art at each pipeline stage:
+
+```
+. . . . | . . . . | . . . .
+- - - - + - - - - + - - - -
+. . . . | R R R . | . . . .
+. . . . | R R R . | . . . .
+= = = = # = = = = # = = = =
+```
+
+Legend: `.` white, `R` red, `B` blue, `Y` yellow, `K` black, `G` gray, `-` thin hLine, `=` thick hLine, `|` thin vLine, `+` thin intersection, `#` thick intersection.
+
 ## Build
 
 ```bash

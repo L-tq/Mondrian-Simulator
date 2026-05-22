@@ -17,9 +17,44 @@ export const COLORS: Record<ColorName, string> = {
   gray: '#B8B8B0',
 };
 
+const COLOR_CHARS: Record<ColorName, string> = {
+  white: '.', red: 'R', blue: 'B', yellow: 'Y', black: 'K', gray: 'G',
+};
+
 export interface MondrianState {
   grid: Grid<Cell>;
   size: number;
+}
+
+// ---------------------------------------------------------------------------
+// Debug
+// ---------------------------------------------------------------------------
+
+export let DEBUG = false;
+export function setDebug(v: boolean): void { DEBUG = v; }
+
+function log(msg: string): void {
+  if (DEBUG) console.log(`[mondrian] ${msg}`);
+}
+
+export function printGrid(grid: Grid<Cell>, label?: string): void {
+  if (!DEBUG) return;
+  if (label) console.log(`--- ${label} ---`);
+  const lines: string[] = [];
+  for (let r = 0; r < grid.rows; r++) {
+    let line = '';
+    for (let c = 0; c < grid.cols; c++) {
+      const cell = grid.get(r, c);
+      switch (cell.kind) {
+        case 'block':  line += COLOR_CHARS[cell.color]; break;
+        case 'hLine':  line += cell.thick ? '=' : '-'; break;
+        case 'vLine':  line += cell.thick ? '‖' : '|'; break;
+        case 'both':   line += cell.thickH || cell.thickV ? '#' : '+'; break;
+      }
+    }
+    lines.push(`${String(r).padStart(2)} ${line}`);
+  }
+  console.log(lines.join('\n'));
 }
 
 // ---------------------------------------------------------------------------
@@ -40,18 +75,6 @@ function vLine(thick = false): Cell {
 
 function both(thickH = false, thickV = false): Cell {
   return { kind: 'both', thickH, thickV };
-}
-
-function getThickH(cell: Cell): boolean {
-  if (cell.kind === 'hLine') return cell.thick;
-  if (cell.kind === 'both') return cell.thickH;
-  return false;
-}
-
-function getThickV(cell: Cell): boolean {
-  if (cell.kind === 'vLine') return cell.thick;
-  if (cell.kind === 'both') return cell.thickV;
-  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +122,6 @@ function selectSpaced(arr: number[], count: number, minGap: number): number[] {
       if (selected.length >= count) break;
     }
   }
-  // Fallback: relax gap if we couldn't find enough
   if (selected.length < count) {
     for (const val of shuffled) {
       if (!selected.includes(val)) {
@@ -118,18 +140,23 @@ function selectSpaced(arr: number[], count: number, minGap: number): number[] {
 export function createInitialState(size: number): MondrianState {
   const grid = new Grid<Cell>(size, size, block('white'));
 
-  const numHLines = 3 + randInt(Math.floor(size * 0.22));
-  const numVLines = 3 + randInt(Math.floor(size * 0.22));
+  // Always include edge rows/cols so the outer frame is closed
+  const numHLines = 4 + randInt(Math.floor(size * 0.16));
+  const numVLines = 4 + randInt(Math.floor(size * 0.16));
 
-  const allIndices = Array.from({ length: size }, (_, i) => i);
-  const hRows = selectSpaced(allIndices, numHLines, 1);
-  const vCols = selectSpaced(allIndices, numVLines, 1);
+  // Interior candidates (exclude edges, which are always included)
+  const interior = Array.from({ length: size - 2 }, (_, i) => i + 1);
+  const hRows = [0, size - 1, ...selectSpaced(interior, numHLines - 2, 1)];
+  const vCols = [0, size - 1, ...selectSpaced(interior, numVLines - 2, 1)];
 
-  // Mark 1-2 lines in each direction as thick
-  const numThickH = Math.min(1 + randInt(2), hRows.length);
-  const numThickV = Math.min(1 + randInt(2), vCols.length);
+  // Mark 1-2 interior lines in each direction as thick (edges too)
+  const numThickH = Math.min(1 + randInt(3), hRows.length);
+  const numThickV = Math.min(1 + randInt(3), vCols.length);
   const thickHSet = new Set(shuffle(hRows).slice(0, numThickH));
   const thickVSet = new Set(shuffle(vCols).slice(0, numThickV));
+
+  log(`hRows: [${hRows.join(',')}]  thickH: [${[...thickHSet].join(',')}]`);
+  log(`vCols: [${vCols.join(',')}]  thickV: [${[...thickVSet].join(',')}]`);
 
   // Place full-width horizontal lines
   for (const row of hRows) {
@@ -159,68 +186,51 @@ export function createInitialState(size: number): MondrianState {
 // Phase 0b — Segment pruning for variety
 // ---------------------------------------------------------------------------
 
-function pruneSegments(grid: Grid<Cell>): void {
-  // Collect line positions
-  const hRows = new Set<number>();
-  const vCols = new Set<number>();
-  for (let r = 0; r < grid.rows; r++) {
-    for (let c = 0; c < grid.cols; c++) {
-      const kind = grid.get(r, c).kind;
-      if (isHLike(kind)) hRows.add(r);
-      if (isVLike(kind)) vCols.add(c);
-    }
+function removeLines(grid: Grid<Cell>): void {
+  // Collect interior line positions (exclude frame at 0 and size-1)
+  const hRows: number[] = [];
+  const vCols: number[] = [];
+  for (let r = 1; r < grid.rows - 1; r++) {
+    if (isHLike(grid.get(r, 0).kind)) hRows.push(r);
+  }
+  for (let c = 1; c < grid.cols - 1; c++) {
+    if (isVLike(grid.get(0, c).kind)) vCols.push(c);
   }
 
-  const sortedVCols = [...vCols].sort((a, b) => a - b);
-  const sortedHRows = [...hRows].sort((a, b) => a - b);
+  let removedH = 0;
+  let removedV = 0;
 
-  // Prune horizontal line segments between vertical lines
+  // Remove entire horizontal lines (never the outer frame)
   for (const row of hRows) {
-    const breakpoints = [0, ...sortedVCols, grid.cols - 1];
-    for (let i = 0; i < breakpoints.length - 1; i++) {
-      const start = i === 0 ? 0 : breakpoints[i] + 1;
-      const end = i === breakpoints.length - 2 ? breakpoints[i + 1] : breakpoints[i + 1] - 1;
-      if (start > end) continue;
-
-      const isEdge = i === 0 || i === breakpoints.length - 2;
-      const prob = isEdge ? 0.12 : 0.22;
-
-      if (Math.random() < prob) {
-        for (let c = start; c <= end; c++) {
-          const cell = grid.get(row, c);
-          if (cell.kind === 'both') {
-            grid.set(row, c, vLine(cell.thickV));
-          } else if (cell.kind === 'hLine') {
-            grid.set(row, c, block());
-          }
+    if (Math.random() < 0.3) {
+      for (let c = 0; c < grid.cols; c++) {
+        const cell = grid.get(row, c);
+        if (cell.kind === 'both') {
+          grid.set(row, c, vLine(cell.thickV));
+        } else if (cell.kind === 'hLine') {
+          grid.set(row, c, block());
         }
       }
+      removedH++;
     }
   }
 
-  // Prune vertical line segments between horizontal lines
+  // Remove entire vertical lines (never the outer frame)
   for (const col of vCols) {
-    const breakpoints = [0, ...sortedHRows, grid.rows - 1];
-    for (let i = 0; i < breakpoints.length - 1; i++) {
-      const start = i === 0 ? 0 : breakpoints[i] + 1;
-      const end = i === breakpoints.length - 2 ? breakpoints[i + 1] : breakpoints[i + 1] - 1;
-      if (start > end) continue;
-
-      const isEdge = i === 0 || i === breakpoints.length - 2;
-      const prob = isEdge ? 0.08 : 0.18;
-
-      if (Math.random() < prob) {
-        for (let r = start; r <= end; r++) {
-          const cell = grid.get(r, col);
-          if (cell.kind === 'both') {
-            grid.set(r, col, hLine(cell.thickH));
-          } else if (cell.kind === 'vLine') {
-            grid.set(r, col, block());
-          }
+    if (Math.random() < 0.3) {
+      for (let r = 0; r < grid.rows; r++) {
+        const cell = grid.get(r, col);
+        if (cell.kind === 'both') {
+          grid.set(r, col, hLine(cell.thickH));
+        } else if (cell.kind === 'vLine') {
+          grid.set(r, col, block());
         }
       }
+      removedV++;
     }
   }
+
+  log(`removed lines: ${removedH} H, ${removedV} V`);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +243,7 @@ function refinementUpdater(): CellUpdater<Cell> {
     const kind = cell.kind;
 
     if (kind === 'hLine') {
-      // Remove hLine cells that have no crossing vLine anywhere on this or adjacent rows
+      // Check if there is any vLine crossing this hLine (same row or adjacent rows)
       const hasVNearby = (rr: number) => {
         for (let c = 0; c < grid.cols; c++) {
           if (isVLike(grid.get(rr, c).kind)) return true;
@@ -244,7 +254,7 @@ function refinementUpdater(): CellUpdater<Cell> {
         hasVNearby(row) ||
         (row > 0 && hasVNearby(row - 1)) ||
         (row < grid.rows - 1 && hasVNearby(row + 1));
-      if (!crossesV && Math.random() < 0.6) return block();
+      if (!crossesV && Math.random() < 0.5) return block();
       return cell;
     }
 
@@ -259,12 +269,12 @@ function refinementUpdater(): CellUpdater<Cell> {
         hasHNearby(col) ||
         (col > 0 && hasHNearby(col - 1)) ||
         (col < grid.cols - 1 && hasHNearby(col + 1));
-      if (!crossesH && Math.random() < 0.6) return block();
+      if (!crossesH && Math.random() < 0.5) return block();
       return cell;
     }
 
     if (kind === 'both') {
-      // Check line continuation: hLine continues left/right, vLine continues up/down
+      // Check line continuation: hLine goes left/right, vLine goes up/down
       const hLeft = col > 0 && isHLike(grid.get(row, col - 1).kind);
       const hRight = col < grid.cols - 1 && isHLike(grid.get(row, col + 1).kind);
       const vUp = row > 0 && isVLike(grid.get(row - 1, col).kind);
@@ -273,7 +283,7 @@ function refinementUpdater(): CellUpdater<Cell> {
       const hCont = (hLeft ? 1 : 0) + (hRight ? 1 : 0);
       const vCont = (vUp ? 1 : 0) + (vDown ? 1 : 0);
 
-      if (hCont + vCont < 2 && Math.random() < 0.5) {
+      if (hCont + vCont < 2 && Math.random() < 0.4) {
         if (hCont >= vCont) {
           return hLine(cell.thickH);
         } else {
@@ -429,36 +439,45 @@ function assignColors(regions: Region[], adj: Map<number, Set<number>>, colorInt
 export function evolveState(state: MondrianState, colorIntensity: number): MondrianState {
   let grid = state.grid;
 
-  // Phase 0: Prune segments to create varied region sizes
-  pruneSegments(grid);
+  printGrid(grid, 'initial');
+
+  // Phase 0: Remove some interior lines to create varied rectangle sizes
+  removeLines(grid);
+  printGrid(grid, 'after line removal');
 
   // Phase 1: Refinement — cleanup orphan lines and fix intersections
   grid = runCA(grid, refinementUpdater(), 2);
+  printGrid(grid, 'after refinement 1');
 
   // Phase 2: Color assignment
   const regions = findRegions(grid);
   const adj = buildAdjacency(grid, regions);
   assignColors(regions, adj, colorIntensity);
+  log(`coloring: ${regions.length} regions, ${regions.filter(r => r.color !== 'white').length} colored`);
 
   for (const reg of regions) {
     for (const [r, c] of reg.cells) {
       grid.set(r, c, { kind: 'block', color: reg.color });
     }
   }
+  printGrid(grid, 'after color 1');
 
-  // Phase 3: Refinement after coloring
-  grid = runCA(grid, refinementUpdater(), 2);
+  // Phase 3: Refinement after coloring (lighter pass)
+  grid = runCA(grid, refinementUpdater(), 1);
+  printGrid(grid, 'after refinement 2');
 
   // Re-color after refinement
   const finalRegions = findRegions(grid);
   const finalAdj = buildAdjacency(grid, finalRegions);
   assignColors(finalRegions, finalAdj, colorIntensity);
+  log(`final coloring: ${finalRegions.length} regions, ${finalRegions.filter(r => r.color !== 'white').length} colored`);
 
   for (const reg of finalRegions) {
     for (const [r, c] of reg.cells) {
       grid.set(r, c, { kind: 'block', color: reg.color });
     }
   }
+  printGrid(grid, 'final');
 
   return { grid, size: state.size };
 }

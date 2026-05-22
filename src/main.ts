@@ -1,5 +1,11 @@
-import { createInitialState, evolveState } from './mondrian';
+import { createInitialState, evolveState, setDebug } from './mondrian';
 import { renderMondrian } from './renderer';
+
+// Enable debug mode via ?debug=1 URL parameter
+if (typeof window !== 'undefined' && /[?&]debug=1/.test(window.location.search)) {
+  setDebug(true);
+  console.log('[main] debug mode enabled');
+}
 
 const canvas = document.getElementById('mondrian-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
