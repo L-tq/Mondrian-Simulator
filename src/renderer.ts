@@ -179,6 +179,7 @@ export function drawMondrian(
   }
 
   // ---- Phase 4: Intersection patches ----
+  // Fill the center of every hLine×vLine crossing so the bars form a solid "+".
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
       const cell = grid.get(r, c);
@@ -193,5 +194,42 @@ export function drawMondrian(
         .rect(Math.round(x - barW / 2), Math.round(y - barH / 2), barW, barH)
         .fill({ color: COLORS.black });
     }
+  }
+
+  // ---- Phase 5: Outer frame corner patches ----
+  // The continuous bars from Phase 3 leave a barW/2 × barH/2 notch at
+  // the three outer frame corners where edge-closing lines meet but no
+  // "both" cell exists (top-left is already covered by cell 0,0 above).
+
+  const topThick = hLineRows.get(0) ?? false;
+  const bottomThick = hLineRows.get(size - 1) ?? false;
+  const leftThick = vLineCols.get(0) ?? false;
+  const rightThick = vLineCols.get(size - 1) ?? false;
+
+  // Top-right: top hLine meets right edge vLine
+  {
+    const barH = topThick ? thickPx : thinPx;
+    const barW = rightThick ? thickPx : thinPx;
+    graphics
+      .rect(Math.round(px(size) - barW / 2), Math.round(py(0) - barH / 2), barW, barH)
+      .fill({ color: COLORS.black });
+  }
+
+  // Bottom-left: bottom edge hLine meets left vLine
+  {
+    const barH = bottomThick ? thickPx : thinPx;
+    const barW = leftThick ? thickPx : thinPx;
+    graphics
+      .rect(Math.round(px(0) - barW / 2), Math.round(py(size) - barH / 2), barW, barH)
+      .fill({ color: COLORS.black });
+  }
+
+  // Bottom-right: bottom edge hLine meets right edge vLine
+  {
+    const barH = bottomThick ? thickPx : thinPx;
+    const barW = rightThick ? thickPx : thinPx;
+    graphics
+      .rect(Math.round(px(size) - barW / 2), Math.round(py(size) - barH / 2), barW, barH)
+      .fill({ color: COLORS.black });
   }
 }
