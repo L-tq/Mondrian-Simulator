@@ -14,12 +14,15 @@ html, body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-#mondrian-canvas {
-  display: block;
+#pixi-container {
   position: absolute;
   top: 46%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+#pixi-container canvas {
+  display: block;
 }
 
 #controls {
