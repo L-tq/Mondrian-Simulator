@@ -197,40 +197,86 @@ function removeLines(grid: Grid<Cell>): void {
     if (isVLike(grid.get(0, c).kind)) vCols.push(c);
   }
 
-  let removedH = 0;
-  let removedV = 0;
+  let removedHSeg = 0;
+  let removedVSeg = 0;
 
-  // Remove entire horizontal lines (never the outer frame)
+  // Remove individual horizontal segments from interior rows
   for (const row of hRows) {
-    if (Math.random() < 0.3) {
-      for (let c = 0; c < grid.cols; c++) {
-        const cell = grid.get(row, c);
-        if (cell.kind === 'both') {
-          grid.set(row, c, vLine(cell.thickV));
-        } else if (cell.kind === 'hLine') {
-          grid.set(row, c, block());
+    let segStart = -1;
+    for (let c = 0; c < grid.cols; c++) {
+      if (isHLike(grid.get(row, c).kind)) {
+        if (segStart === -1) segStart = c;
+      } else {
+        if (segStart !== -1) {
+          if (Math.random() < 0.4) {
+            for (let cc = segStart; cc < c; cc++) {
+              const cell = grid.get(row, cc);
+              if (cell.kind === 'both') {
+                grid.set(row, cc, vLine(cell.thickV));
+              } else if (cell.kind === 'hLine') {
+                grid.set(row, cc, block());
+              }
+            }
+            removedHSeg++;
+          }
+          segStart = -1;
         }
       }
-      removedH++;
+    }
+    if (segStart !== -1) {
+      if (Math.random() < 0.4) {
+        for (let cc = segStart; cc < grid.cols; cc++) {
+          const cell = grid.get(row, cc);
+          if (cell.kind === 'both') {
+            grid.set(row, cc, vLine(cell.thickV));
+          } else if (cell.kind === 'hLine') {
+            grid.set(row, cc, block());
+          }
+        }
+        removedHSeg++;
+      }
     }
   }
 
-  // Remove entire vertical lines (never the outer frame)
+  // Remove individual vertical segments from interior columns
   for (const col of vCols) {
-    if (Math.random() < 0.3) {
-      for (let r = 0; r < grid.rows; r++) {
-        const cell = grid.get(r, col);
-        if (cell.kind === 'both') {
-          grid.set(r, col, hLine(cell.thickH));
-        } else if (cell.kind === 'vLine') {
-          grid.set(r, col, block());
+    let segStart = -1;
+    for (let r = 0; r < grid.rows; r++) {
+      if (isVLike(grid.get(r, col).kind)) {
+        if (segStart === -1) segStart = r;
+      } else {
+        if (segStart !== -1) {
+          if (Math.random() < 0.4) {
+            for (let rr = segStart; rr < r; rr++) {
+              const cell = grid.get(rr, col);
+              if (cell.kind === 'both') {
+                grid.set(rr, col, hLine(cell.thickH));
+              } else if (cell.kind === 'vLine') {
+                grid.set(rr, col, block());
+              }
+            }
+            removedVSeg++;
+          }
+          segStart = -1;
         }
       }
-      removedV++;
+    }
+    if (segStart !== -1) {
+      if (Math.random() < 0.4) {
+        for (let rr = segStart; rr < grid.rows; rr++) {
+          const cell = grid.get(rr, col);
+          if (cell.kind === 'both') {
+            grid.set(rr, col, hLine(cell.thickH));
+          } else if (cell.kind === 'vLine') {
+            grid.set(rr, col, block());
+          }
+        }
+        removedVSeg++;
+      }
     }
   }
 
-  log(`removed lines: ${removedH} H, ${removedV} V`);
+  log(`removed segments: ${removedHSeg} H, ${removedVSeg} V`);
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,20 @@ function isVLike(kind: string): boolean {
   return kind === 'vLine' || kind === 'both';
 }
 
+function rowHasHLine(grid: { get: (r: number, c: number) => { kind: string } }, row: number, colStart: number, colEnd: number): boolean {
+  for (let c = colStart; c <= colEnd; c++) {
+    if (isHLike(grid.get(row, c).kind)) return true;
+  }
+  return false;
+}
+
+function colHasVLine(grid: { get: (r: number, c: number) => { kind: string } }, col: number, rowStart: number, rowEnd: number): boolean {
+  for (let r = rowStart; r <= rowEnd; r++) {
+    if (isVLike(grid.get(r, col).kind)) return true;
+  }
+  return false;
+}
+
 export function drawMondrian(
   graphics: Graphics,
   state: MondrianState,
@@ -103,29 +117,29 @@ export function drawMondrian(
         }
       }
 
-      // Find enclosing line positions
+      // Find enclosing line positions (scan across region span for segmented lines)
       let topLine = -1;
       for (let rr = minR - 1; rr >= -1; rr--) {
         if (rr < 0) { topLine = -1; break; }
-        if (isHLike(grid.get(rr, minC).kind)) { topLine = rr; break; }
+        if (rowHasHLine(grid, rr, minC, maxC)) { topLine = rr; break; }
       }
 
       let bottomLine = size;
       for (let rr = maxR + 1; rr <= size; rr++) {
         if (rr >= size) { bottomLine = size; break; }
-        if (isHLike(grid.get(rr, minC).kind)) { bottomLine = rr; break; }
+        if (rowHasHLine(grid, rr, minC, maxC)) { bottomLine = rr; break; }
       }
 
       let leftLine = -1;
       for (let cc = minC - 1; cc >= -1; cc--) {
         if (cc < 0) { leftLine = -1; break; }
-        if (isVLike(grid.get(minR, cc).kind)) { leftLine = cc; break; }
+        if (colHasVLine(grid, cc, minR, maxR)) { leftLine = cc; break; }
       }
 
       let rightLine = size;
       for (let cc = maxC + 1; cc <= size; cc++) {
         if (cc >= size) { rightLine = size; break; }
-        if (isVLike(grid.get(minR, cc).kind)) { rightLine = cc; break; }
+        if (colHasVLine(grid, cc, minR, maxR)) { rightLine = cc; break; }
       }
 
       const fillLeft = leftLine;
@@ -142,15 +156,39 @@ export function drawMondrian(
     }
   }
 
-  // ---- Phase 3: Draw lines on top as continuous bars ----
+  // ---- Phase 3: Draw lines on top as segments ----
   const gridW = px(size) - px(0);
   const gridH = py(size) - py(0);
 
-  // Horizontal bars
+  // Horizontal segments — interior rows drawn per-run, frame rows full-width
   for (const [row, thick] of hLineRows) {
     const barH = thick ? thickPx : thinPx;
     const y = py(row);
-    graphics.rect(px(0), Math.round(y - barH / 2), gridW, barH).fill({ color: COLORS.black });
+
+    if (row === 0 || row === size - 1) {
+      // Frame rows are always continuous
+      graphics.rect(px(0), Math.round(y - barH / 2), gridW, barH).fill({ color: COLORS.black });
+    } else {
+      // Draw contiguous runs of hLine/both cells as individual segments
+      let runStart = -1;
+      for (let c = 0; c < size; c++) {
+        if (isHLike(grid.get(row, c).kind)) {
+          if (runStart === -1) runStart = c;
+        } else {
+          if (runStart !== -1) {
+            const x = px(runStart);
+            const w = px(c) - px(runStart);
+            graphics.rect(x, Math.round(y - barH / 2), w, barH).fill({ color: COLORS.black });
+            runStart = -1;
+          }
+        }
+      }
+      if (runStart !== -1) {
+        const x = px(runStart);
+        const w = px(size) - px(runStart);
+        graphics.rect(x, Math.round(y - barH / 2), w, barH).fill({ color: COLORS.black });
+      }
+    }
   }
 
   // Bottom edge closing line
@@ -162,11 +200,35 @@ export function drawMondrian(
     graphics.rect(px(0), Math.round(y - barH / 2), gridW, barH).fill({ color: COLORS.black });
   }
 
-  // Vertical bars
+  // Vertical segments — interior columns drawn per-run, frame columns full-height
   for (const [col, thick] of vLineCols) {
     const barW = thick ? thickPx : thinPx;
     const x = px(col);
-    graphics.rect(Math.round(x - barW / 2), py(0), barW, gridH).fill({ color: COLORS.black });
+
+    if (col === 0 || col === size - 1) {
+      // Frame columns are always continuous
+      graphics.rect(Math.round(x - barW / 2), py(0), barW, gridH).fill({ color: COLORS.black });
+    } else {
+      // Draw contiguous runs of vLine/both cells as individual segments
+      let runStart = -1;
+      for (let r = 0; r < size; r++) {
+        if (isVLike(grid.get(r, col).kind)) {
+          if (runStart === -1) runStart = r;
+        } else {
+          if (runStart !== -1) {
+            const y = py(runStart);
+            const h = py(r) - py(runStart);
+            graphics.rect(Math.round(x - barW / 2), y, barW, h).fill({ color: COLORS.black });
+            runStart = -1;
+          }
+        }
+      }
+      if (runStart !== -1) {
+        const y = py(runStart);
+        const h = py(size) - py(runStart);
+        graphics.rect(Math.round(x - barW / 2), y, barW, h).fill({ color: COLORS.black });
+      }
+    }
   }
 
   // Right edge closing line
