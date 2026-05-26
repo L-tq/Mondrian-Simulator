@@ -527,3 +527,56 @@ export function evolveState(state: MondrianState, colorIntensity: number): Mondr
 
   return { grid, size: state.size };
 }
+
+// ---------------------------------------------------------------------------
+// Step-by-step evolution for animation
+// ---------------------------------------------------------------------------
+
+export interface MondrianStep {
+  state: MondrianState;
+  label: string;
+}
+
+export function evolveStateSteps(state: MondrianState, colorIntensity: number): MondrianStep[] {
+  const steps: MondrianStep[] = [];
+  const size = state.size;
+  let grid = state.grid.clone();
+
+  steps.push({ state: { grid: grid.clone(), size }, label: 'Initial Grid' });
+
+  // Phase 0: Remove some interior lines
+  removeLines(grid);
+  steps.push({ state: { grid: grid.clone(), size }, label: 'Removing Lines' });
+
+  // Phase 1: Refinement
+  grid = runCA(grid, refinementUpdater(), 2);
+  steps.push({ state: { grid: grid.clone(), size }, label: 'Refining Lines' });
+
+  // Phase 2: Color assignment
+  const regions = findRegions(grid);
+  const adj = buildAdjacency(grid, regions);
+  assignColors(regions, adj, colorIntensity);
+  for (const reg of regions) {
+    for (const [r, c] of reg.cells) {
+      grid.set(r, c, { kind: 'block', color: reg.color });
+    }
+  }
+  steps.push({ state: { grid: grid.clone(), size }, label: 'Coloring Regions' });
+
+  // Phase 3: Refinement after coloring
+  grid = runCA(grid, refinementUpdater(), 1);
+  steps.push({ state: { grid: grid.clone(), size }, label: 'Final Refinement' });
+
+  // Re-color
+  const finalRegions = findRegions(grid);
+  const finalAdj = buildAdjacency(grid, finalRegions);
+  assignColors(finalRegions, finalAdj, colorIntensity);
+  for (const reg of finalRegions) {
+    for (const [r, c] of reg.cells) {
+      grid.set(r, c, { kind: 'block', color: reg.color });
+    }
+  }
+  steps.push({ state: { grid: grid.clone(), size }, label: 'Complete' });
+
+  return steps;
+}
