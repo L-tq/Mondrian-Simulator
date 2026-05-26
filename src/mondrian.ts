@@ -137,21 +137,23 @@ function selectSpaced(arr: number[], count: number, minGap: number): number[] {
 // Phase 0 — Initial state with full grid lines
 // ---------------------------------------------------------------------------
 
-export function createInitialState(size: number): MondrianState {
+export function createInitialState(size: number, density = 0.5): MondrianState {
   const grid = new Grid<Cell>(size, size, block('white'));
 
-  // Always include edge rows/cols so the outer frame is closed
-  const numHLines = 4 + randInt(Math.floor(size * 0.16));
-  const numVLines = 4 + randInt(Math.floor(size * 0.16));
+  // density 0 = minimal lines, density 1 = dense grid
+  const d = Math.max(0, Math.min(1, density));
+  const lineCount = 4 + randInt(Math.max(1, Math.floor(size * d * 0.5)));
+  const numHLines = lineCount;
+  const numVLines = lineCount;
 
   // Interior candidates (exclude edges, which are always included)
   const interior = Array.from({ length: size - 2 }, (_, i) => i + 1);
   const hRows = [0, size - 1, ...selectSpaced(interior, numHLines - 2, 1)];
   const vCols = [0, size - 1, ...selectSpaced(interior, numVLines - 2, 1)];
 
-  // Mark 1-2 interior lines in each direction as thick (edges too)
-  const numThickH = Math.min(1 + randInt(3), hRows.length);
-  const numThickV = Math.min(1 + randInt(3), vCols.length);
+  // Thick line count scales with grid size and density
+  const numThickH = Math.min(1 + randInt(Math.max(1, Math.floor(size * d * 0.08))), hRows.length);
+  const numThickV = Math.min(1 + randInt(Math.max(1, Math.floor(size * d * 0.08))), vCols.length);
   const thickHSet = new Set(shuffle(hRows).slice(0, numThickH));
   const thickVSet = new Set(shuffle(vCols).slice(0, numThickV));
 
@@ -186,7 +188,10 @@ export function createInitialState(size: number): MondrianState {
 // Phase 0b — Segment pruning for variety
 // ---------------------------------------------------------------------------
 
-function removeLines(grid: Grid<Cell>): void {
+function removeLines(grid: Grid<Cell>, density: number): void {
+  // Higher density → fewer segments removed (0.6 at d=0 → 0.1 at d=1)
+  const removalChance = 0.6 - density * 0.5;
+
   // Collect interior line positions (exclude frame at 0 and size-1)
   const hRows: number[] = [];
   const vCols: number[] = [];
@@ -208,7 +213,7 @@ function removeLines(grid: Grid<Cell>): void {
         if (segStart === -1) segStart = c;
       } else {
         if (segStart !== -1) {
-          if (Math.random() < 0.4) {
+          if (Math.random() < removalChance) {
             for (let cc = segStart; cc < c; cc++) {
               const cell = grid.get(row, cc);
               if (cell.kind === 'both') {
@@ -224,7 +229,7 @@ function removeLines(grid: Grid<Cell>): void {
       }
     }
     if (segStart !== -1) {
-      if (Math.random() < 0.4) {
+      if (Math.random() < removalChance) {
         for (let cc = segStart; cc < grid.cols; cc++) {
           const cell = grid.get(row, cc);
           if (cell.kind === 'both') {
@@ -246,7 +251,7 @@ function removeLines(grid: Grid<Cell>): void {
         if (segStart === -1) segStart = r;
       } else {
         if (segStart !== -1) {
-          if (Math.random() < 0.4) {
+          if (Math.random() < removalChance) {
             for (let rr = segStart; rr < r; rr++) {
               const cell = grid.get(rr, col);
               if (cell.kind === 'both') {
@@ -262,7 +267,7 @@ function removeLines(grid: Grid<Cell>): void {
       }
     }
     if (segStart !== -1) {
-      if (Math.random() < 0.4) {
+      if (Math.random() < removalChance) {
         for (let rr = segStart; rr < grid.rows; rr++) {
           const cell = grid.get(rr, col);
           if (cell.kind === 'both') {
@@ -482,13 +487,13 @@ function assignColors(regions: Region[], adj: Map<number, Set<number>>, colorInt
 // Public API
 // ---------------------------------------------------------------------------
 
-export function evolveState(state: MondrianState, colorIntensity: number): MondrianState {
+export function evolveState(state: MondrianState, colorIntensity: number, density = 0.5): MondrianState {
   let grid = state.grid;
 
   printGrid(grid, 'initial');
 
   // Phase 0: Remove some interior lines to create varied rectangle sizes
-  removeLines(grid);
+  removeLines(grid, density);
   printGrid(grid, 'after line removal');
 
   // Phase 1: Refinement — cleanup orphan lines and fix intersections
@@ -537,7 +542,7 @@ export interface MondrianStep {
   label: string;
 }
 
-export function evolveStateSteps(state: MondrianState, colorIntensity: number): MondrianStep[] {
+export function evolveStateSteps(state: MondrianState, colorIntensity: number, density = 0.5): MondrianStep[] {
   const steps: MondrianStep[] = [];
   const size = state.size;
   let grid = state.grid.clone();
@@ -545,7 +550,7 @@ export function evolveStateSteps(state: MondrianState, colorIntensity: number): 
   steps.push({ state: { grid: grid.clone(), size }, label: 'Initial Grid' });
 
   // Phase 0: Remove some interior lines
-  removeLines(grid);
+  removeLines(grid, density);
   steps.push({ state: { grid: grid.clone(), size }, label: 'Removing Lines' });
 
   // Phase 1: Refinement

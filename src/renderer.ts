@@ -1,5 +1,7 @@
 import { Graphics } from 'pixi.js';
 import { COLORS, MondrianState, ColorName } from './mondrian';
+import type { LifeColor } from './life';
+import type { Grid } from './automata';
 
 function isHLike(kind: string): boolean {
   return kind === 'hLine' || kind === 'both';
@@ -27,7 +29,8 @@ export function drawMondrian(
   graphics: Graphics,
   state: MondrianState,
   width: number,
-  height: number
+  height: number,
+  uniformLines = false
 ): void {
   graphics.clear();
 
@@ -44,7 +47,9 @@ export function drawMondrian(
 
   // Line thickness in integer pixels
   const thinPx = Math.max(2, Math.round(Math.min(cellW, cellH) * 0.18));
-  const thickPx = Math.max(thinPx + 2, Math.round(thinPx * 2.8));
+  const thickPx = uniformLines
+    ? thinPx
+    : Math.max(thinPx + 2, Math.round(thinPx * 2.8));
 
   // ---- Phase 1: Collect hLine rows and vLine columns with thickness ----
   const hLineRows = new Map<number, boolean>(); // row -> thick
@@ -293,5 +298,40 @@ export function drawMondrian(
     graphics
       .rect(Math.round(px(size) - barW / 2), Math.round(py(size) - barH / 2), barW, barH)
       .fill({ color: COLORS.black });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CA grid renderer — cell-by-cell for life-like CA visualization
+// ---------------------------------------------------------------------------
+
+export function drawCAGrid(
+  graphics: Graphics,
+  grid: Grid<LifeColor>,
+  width: number,
+  height: number
+): void {
+  graphics.clear();
+
+  const size = grid.rows;
+  const margin = Math.round(Math.min(width, height) * 0.04);
+  const cellW = (width - 2 * margin) / size;
+  const cellH = (height - 2 * margin) / size;
+
+  // Background
+  graphics.rect(0, 0, width, height).fill({ color: COLORS.white });
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const color = grid.get(r, c);
+      if (color === 'white') continue;
+
+      const x0 = Math.round(margin + c * cellW);
+      const y0 = Math.round(margin + r * cellH);
+      const x1 = Math.round(margin + (c + 1) * cellW);
+      const y1 = Math.round(margin + (r + 1) * cellH);
+
+      graphics.rect(x0, y0, x1 - x0, y1 - y0).fill({ color: COLORS[color] });
+    }
   }
 }
