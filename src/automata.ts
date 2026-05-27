@@ -1,5 +1,3 @@
-export type CellUpdater<T> = (grid: Grid<T>, row: number, col: number) => T;
-
 export class Grid<T> {
   readonly rows: number;
   readonly cols: number;
@@ -29,16 +27,6 @@ export class Grid<T> {
     this.data[row][col] = value;
   }
 
-  clone(): Grid<T> {
-    const g = new Grid<T>(this.rows, this.cols, this.data[0][0]);
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        g.data[r][c] = this.data[r][c];
-      }
-    }
-    return g;
-  }
-
   inBounds(row: number, col: number): boolean {
     return row >= 0 && row < this.rows && col >= 0 && col < this.cols;
   }
@@ -66,32 +54,4 @@ export class Grid<T> {
     }
     return result;
   }
-
-  map<U>(fn: (value: T, row: number, col: number) => U): Grid<U> {
-    const result = new Grid<U>(this.rows, this.cols, undefined as unknown as U);
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        result.set(r, c, fn(this.data[r][c], r, c));
-      }
-    }
-    return result;
-  }
-}
-
-export function stepCA<T>(grid: Grid<T>, updater: CellUpdater<T>): Grid<T> {
-  const next = grid.clone();
-  for (let r = 0; r < grid.rows; r++) {
-    for (let c = 0; c < grid.cols; c++) {
-      next.set(r, c, updater(grid, r, c));
-    }
-  }
-  return next;
-}
-
-export function runCA<T>(grid: Grid<T>, updater: CellUpdater<T>, iterations: number): Grid<T> {
-  let current = grid;
-  for (let i = 0; i < iterations; i++) {
-    current = stepCA(current, updater);
-  }
-  return current;
 }
