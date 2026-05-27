@@ -273,6 +273,246 @@ export function generateMondrianGrid(size: number, params: MondrianParams): Grid
 }
 
 // ---------------------------------------------------------------------------
+// Region extraction & editing
+// ---------------------------------------------------------------------------
+
+export interface ColoredRect {
+  r: number; c: number; h: number; w: number;
+  color: LifeColor;
+}
+
+/** Extract all colored rectangular regions from the grid by scanning for color cells. */
+export function extractRegions(grid: Grid<LifeColor>): ColoredRect[] {
+  const visited = new Set<number>();
+  const regions: ColoredRect[] = [];
+
+  for (let r = 0; r < grid.rows; r++) {
+    for (let c = 0; c < grid.cols; c++) {
+      const key = r * grid.cols + c;
+      if (visited.has(key)) continue;
+      const color = grid.get(r, c);
+      if (color === 'empty' || color === 'line') continue;
+
+      // Flood-fill to find the bounding rectangle of this colored region
+      let minR = r, maxR = r, minC = c, maxC = c;
+      const stack: [number, number][] = [[r, c]];
+      visited.add(key);
+
+      while (stack.length > 0) {
+        const [cr, cc] = stack.pop()!;
+        if (cr < minR) minR = cr;
+        if (cr > maxR) maxR = cr;
+        if (cc < minC) minC = cc;
+        if (cc > maxC) maxC = cc;
+
+        for (const [nr, nc] of grid.neighbors4(cr, cc)) {
+          const nk = nr * grid.cols + nc;
+          if (!visited.has(nk) && grid.get(nr, nc) === color) {
+            visited.add(nk);
+            stack.push([nr, nc]);
+          }
+        }
+      }
+
+      regions.push({
+        r: minR, c: minC,
+        h: maxR - minR + 1,
+        w: maxC - minC + 1,
+        color,
+      });
+    }
+  }
+
+  return regions;
+}
+
+/** Find which region contains cell (r,c). Returns index or -1. */
+export function findRegionAt(regions: ColoredRect[], r: number, c: number): number {
+  for (let i = regions.length - 1; i >= 0; i--) {
+    const rect = regions[i];
+    if (r >= rect.r && r < rect.r + rect.h && c >= rect.c && c < rect.c + rect.w) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/** Change all cells of a region to a new color. */
+export function applyRegionColor(grid: Grid<LifeColor>, region: ColoredRect, newColor: LifeColor): void {
+  region.color = newColor;
+  for (let r = region.r; r < region.r + region.h; r++) {
+    for (let c = region.c; c < region.c + region.w; c++) {
+      if (grid.get(r, c) !== 'line') {
+        grid.set(r, c, newColor);
+      }
+    }
+  }
+}
+
+/** Split a region with a horizontal or vertical line at the given offset from its top/left. */
+export function splitRegion(
+  grid: Grid<LifeColor>,
+  region: ColoredRect,
+  regions: ColoredRect[],
+  regionIdx: number,
+  horizontal: boolean,
+  offset: number,
+  colorA: LifeColor,
+  colorB: LifeColor,
+): void {
+  if (horizontal) {
+    const lineR = region.r + offset;
+    for (let c = region.c; c < region.c + region.w; c++) {
+      grid.set(lineR, c, 'line');
+    }
+    const top: ColoredRect = { r: region.r, c: region.c, h: offset, w: region.w, color: colorA };
+    const bot: ColoredRect = { r: lineR + 1, c: region.c, h: region.h - offset - 1, w: region.w, color: colorB };
+    for (let r = top.r; r < top.r + top.h; r++)
+      for (let c = top.c; c < top.c + top.w; c++)
+        if (grid.get(r, c) !== 'line') grid.set(r, c, colorA);
+    for (let r = bot.r; r < bot.r + bot.h; r++)
+      for (let c = bot.c; c < bot.c + bot.w; c++)
+        if (grid.get(r, c) !== 'line') grid.set(r, c, colorB);
+    regions.splice(regionIdx, 1, top, bot);
+  } else {
+    const lineC = region.c + offset;
+    for (let r = region.r; r < region.r + region.h; r++) {
+      grid.set(r, lineC, 'line');
+    }
+    const left: ColoredRect = { r: region.r, c: region.c, h: region.h, w: offset, color: colorA };
+    const right: ColoredRect = { r: region.r, c: lineC + 1, h: region.h, w: region.w - offset - 1, color: colorB };
+    for (let r = left.r; r < left.r + left.h; r++)
+      for (let c = left.c; c < left.c + left.w; c++)
+        if (grid.get(r, c) !== 'line') grid.set(r, c, colorA);
+    for (let r = right.r; r < right.r + right.h; r++)
+      for (let c = right.c; c < right.c + right.w; c++)
+        if (grid.get(r, c) !== 'line') grid.set(r, c, colorB);
+    regions.splice(regionIdx, 1, left, right);
+  }
+}
+
+/** Human-readable reason why two regions cannot be merged, or null if they can. */
+export function mergeFailureReason(a: ColoredRect, b: ColoredRect): string | null {
+  const aBottom = a.r + a.h;
+  const aRight = a.c + a.w;
+  const bBottom = b.r + b.h;
+  const bRight = b.c + b.w;
+
+  // Horizontal overlap: columns must overlap for vertical adjacency
+  const horizOverlap = a.c < bRight && aRight > b.c;
+  // Vertical overlap: rows must overlap for horizontal adjacency
+  const vertOverlap = a.r < bBottom && aBottom > b.r;
+
+  // Two regions are adjacent if their edges are separated only by line cells
+  // (1-3 cell gap). The regions' bounds exclude the line cells, so:
+  //   A's bottom edge = a.r + a.h = first line cell row below A
+  //   B's top edge  = b.r = first colored cell of B
+  // Gap between them is |aBottom - b.r| = line thickness.
+  const vGapAB = b.r - aBottom; // positive if A is above B
+  const vGapBA = a.r - bBottom; // positive if B is above A
+  const hGapAB = b.c - aRight;  // positive if A is left of B
+  const hGapBA = a.c - bRight;  // positive if B is left of A
+
+  // Adjacent vertically: one above the other, columns overlap, gap is 1-3 line cells
+  if (horizOverlap) {
+    if (vGapAB >= 1 && vGapAB <= 3) return null;
+    if (vGapBA >= 1 && vGapBA <= 3) return null;
+  }
+
+  // Adjacent horizontally: side by side, rows overlap, gap is 1-3 line cells
+  if (vertOverlap) {
+    if (hGapAB >= 1 && hGapAB <= 3) return null;
+    if (hGapBA >= 1 && hGapBA <= 3) return null;
+  }
+
+  if (!horizOverlap && !vertOverlap)
+    return 'Rectangles do not share any edge — they are diagonal.';
+  if (horizOverlap && (vGapAB === 0 || vGapBA === 0))
+    return 'Rectangles touch directly with no separating line.';
+  if (vertOverlap && (hGapAB === 0 || hGapBA === 0))
+    return 'Rectangles touch directly with no separating line.';
+  if (horizOverlap && (vGapAB > 3 || vGapBA > 3))
+    return 'Rectangles are too far apart — they must be adjacent.';
+  if (vertOverlap && (hGapAB > 3 || hGapBA > 3))
+    return 'Rectangles are too far apart — they must be adjacent.';
+  return 'Rectangles must share a common edge to be merged.';
+}
+
+/**
+ * Merge two adjacent regions by removing the line between them.
+ * Returns the merged region, or null if the regions are not adjacent.
+ */
+export function mergeRegions(
+  grid: Grid<LifeColor>,
+  regions: ColoredRect[],
+  idxA: number,
+  idxB: number,
+  mergedColor: LifeColor,
+): ColoredRect | null {
+  const a = regions[idxA];
+  const b = regions[idxB];
+
+  // Determine adjacency direction
+  const aBottom = a.r + a.h;
+  const aRight = a.c + a.w;
+  const bBottom = b.r + b.h;
+  const bRight = b.c + b.w;
+
+  let merged: ColoredRect | null = null;
+
+  // A above B, sharing same columns?
+  if (aBottom <= b.r && a.c < bRight && aRight > b.c) {
+    const lineR = aBottom;
+    // Remove the line
+    for (let c = Math.max(a.c, b.c); c < Math.min(aRight, bRight); c++) {
+      grid.set(lineR, c, mergedColor);
+      // Also clear adjacent line cells if they exist
+      if (lineR + 1 < grid.rows && grid.get(lineR + 1, c) === 'line') grid.set(lineR + 1, c, mergedColor);
+      if (lineR - 1 >= 0 && grid.get(lineR - 1, c) === 'line') grid.set(lineR - 1, c, mergedColor);
+    }
+    merged = {
+      r: Math.min(a.r, b.r), c: Math.min(a.c, b.c),
+      h: Math.max(aBottom, bBottom) - Math.min(a.r, b.r),
+      w: Math.max(aRight, bRight) - Math.min(a.c, b.c),
+      color: mergedColor,
+    };
+  }
+  // A left of B, sharing same rows?
+  else if (aRight <= b.c && a.r < bBottom && aBottom > b.r) {
+    const lineC = aRight;
+    for (let r = Math.max(a.r, b.r); r < Math.min(aBottom, bBottom); r++) {
+      grid.set(r, lineC, mergedColor);
+      if (lineC + 1 < grid.cols && grid.get(r, lineC + 1) === 'line') grid.set(r, lineC + 1, mergedColor);
+      if (lineC - 1 >= 0 && grid.get(r, lineC - 1) === 'line') grid.set(r, lineC - 1, mergedColor);
+    }
+    merged = {
+      r: Math.min(a.r, b.r), c: Math.min(a.c, b.c),
+      h: Math.max(aBottom, bBottom) - Math.min(a.r, b.r),
+      w: Math.max(aRight, bRight) - Math.min(a.c, b.c),
+      color: mergedColor,
+    };
+  }
+
+  if (merged) {
+    // Recolor the merged area
+    for (let r = merged.r; r < merged.r + merged.h; r++) {
+      for (let c = merged.c; c < merged.c + merged.w; c++) {
+        if (grid.get(r, c) !== 'line') {
+          grid.set(r, c, mergedColor);
+        }
+      }
+    }
+    // Replace the two regions with the merged one
+    const minIdx = Math.min(idxA, idxB);
+    const maxIdx = Math.max(idxA, idxB);
+    regions.splice(maxIdx, 1);
+    regions.splice(minIdx, 1, merged);
+  }
+
+  return merged;
+}
+
+// ---------------------------------------------------------------------------
 // Debug
 // ---------------------------------------------------------------------------
 

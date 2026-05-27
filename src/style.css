@@ -157,3 +157,107 @@ html, body {
   opacity: 0;
   pointer-events: none;
 }
+
+#edit-toolbar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 30, 30, 0.92);
+  backdrop-filter: blur(12px);
+  padding: 6px 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 12;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+#edit-toolbar.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-8px);
+}
+
+.toolbar-label {
+  color: #888;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.12);
+  margin: 0 4px;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+}
+
+.swatch:hover {
+  transform: scale(1.15);
+  border-color: rgba(255,255,255,0.6);
+}
+
+.swatch-red    { background: #C82020; }
+.swatch-blue   { background: #1E5090; }
+.swatch-yellow { background: #E8C800; }
+.swatch-white  { background: #F8F6F0; }
+.swatch-black  { background: #141414; border-color: rgba(255,255,255,0.4); }
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: rgba(255,255,255,0.08);
+  color: #ccc;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.12s;
+}
+
+.toolbar-btn:hover {
+  background: rgba(255,255,255,0.18);
+}
+
+.toolbar-delete:hover {
+  background: rgba(200, 32, 32, 0.4);
+}
+
+#toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  background: rgba(200, 60, 40, 0.92);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  z-index: 20;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+}
+
+#toast.toast-hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-12px);
+}

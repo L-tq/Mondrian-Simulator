@@ -1,8 +1,9 @@
 import { Application, Graphics } from 'pixi.js';
 import type { Grid } from './automata';
 import type { LifeColor, MondrianParams, MondrianState } from './mondrian';
-import { generateMondrianGrid, initMondrianState, stepMondrian, dumpGrid } from './mondrian';
-import { drawGrid, COLORS } from './renderer';
+import { generateMondrianGrid, initMondrianState, stepMondrian, dumpGrid, extractRegions, findRegionAt, applyRegionColor, splitRegion, mergeRegions, mergeFailureReason } from './mondrian';
+import type { ColoredRect } from './mondrian';
+import { drawGrid, drawHighlight, COLORS } from './renderer';
 
 const DEBUG = typeof window !== 'undefined' && /[?&]debug=1/.test(window.location.search);
 if (DEBUG) console.log('[main] debug mode enabled');
@@ -119,6 +120,11 @@ let mondrianState: MondrianState | null = null;
 let isPlaying = false;
 let genCount = 0;
 let animTimer: number | null = null;
+let regions: ColoredRect[] = [];
+let selectedIdx: number = -1;
+let secondSelectedIdx: number = -1;
+let highlightGraphics: Graphics | null = null;
+let gridPixelSize = 0; // canvasSize passed to draw functions
 
 const app = new Application();
 
@@ -143,6 +149,13 @@ async function init(): Promise<void> {
 
   const graphics = new Graphics();
   app.stage.addChild(graphics);
+
+  highlightGraphics = new Graphics();
+  app.stage.addChild(highlightGraphics);
+
+  // Attach click handler
+  app.canvas.addEventListener('pointerdown', onCanvasClick);
+  app.canvas.style.touchAction = 'none';
 
   function resize(): void {
     const dpr = window.devicePixelRatio || 1;
@@ -169,6 +182,138 @@ async function init(): Promise<void> {
     };
   }
 
+  function refreshRegions(): void {
+    if (currentGrid !== null) {
+      regions = extractRegions(currentGrid);
+    }
+  }
+
+  function redrawAll(): void {
+    if (currentGrid === null) return;
+    drawGrid(graphics, currentGrid, canvasSize, canvasSize);
+    highlightGraphics?.clear();
+    if (selectedIdx >= 0 && selectedIdx < regions.length) {
+      drawHighlight(highlightGraphics!, regions[selectedIdx], currentGrid.rows, canvasSize, canvasSize);
+    }
+    if (secondSelectedIdx >= 0 && secondSelectedIdx < regions.length) {
+      drawHighlight(highlightGraphics!, regions[secondSelectedIdx], currentGrid.rows, canvasSize, canvasSize);
+    }
+    updateEditToolbar();
+  }
+
+  function updateEditToolbar(): void {
+    const bar = document.getElementById('edit-toolbar');
+    if (!bar) return;
+    if (selectedIdx >= 0) {
+      bar.classList.remove('hidden');
+    } else {
+      bar.classList.add('hidden');
+    }
+  }
+
+  function gridFromPixel(px: number, py: number): { r: number; c: number } | null {
+    if (currentGrid === null) return null;
+    const size = currentGrid.rows;
+    const margin = Math.round(Math.min(canvasSize, canvasSize) * 0.04);
+    const cellW = (canvasSize - 2 * margin) / size;
+    const cellH = (canvasSize - 2 * margin) / size;
+    // Account for CSS scaling
+    const scaleX = canvasSize / (app.canvas.clientWidth || canvasSize);
+    const scaleY = canvasSize / (app.canvas.clientHeight || canvasSize);
+    const c = Math.floor((px * scaleX - margin) / cellW);
+    const r = Math.floor((py * scaleY - margin) / cellH);
+    if (r < 0 || r >= size || c < 0 || c >= size) return null;
+    return { r, c };
+  }
+
+  function onCanvasClick(e: PointerEvent): void {
+    const rect = app.canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const cell = gridFromPixel(px, py);
+    if (!cell || currentGrid === null) return;
+
+    const color = currentGrid.get(cell.r, cell.c);
+    if (color === 'empty' || color === 'line') {
+      // Clicked on a line or empty area — deselect
+      selectedIdx = -1;
+      secondSelectedIdx = -1;
+      redrawAll();
+      return;
+    }
+
+    const idx = findRegionAt(regions, cell.r, cell.c);
+    if (idx < 0) return;
+
+    if (e.shiftKey) {
+      // Shift+click: select second region for merge
+      if (selectedIdx >= 0 && idx !== selectedIdx) {
+        secondSelectedIdx = idx;
+      } else {
+        secondSelectedIdx = -1;
+      }
+    } else {
+      selectedIdx = idx;
+      secondSelectedIdx = -1;
+    }
+
+    redrawAll();
+  }
+
+  function changeSelectedColor(color: LifeColor): void {
+    if (currentGrid === null || selectedIdx < 0 || selectedIdx >= regions.length) return;
+    applyRegionColor(currentGrid, regions[selectedIdx], color);
+    redrawAll();
+  }
+
+  function splitSelectedRegion(horizontal: boolean): void {
+    if (currentGrid === null || selectedIdx < 0 || selectedIdx >= regions.length) return;
+    const region = regions[selectedIdx];
+    const minDim = horizontal ? region.h : region.w;
+    if (minDim < 5) return; // need at least 5 cells to split (2+line+2)
+    const offset = Math.floor(minDim / 2);
+    splitRegion(currentGrid, region, regions, selectedIdx, horizontal, offset, region.color, region.color);
+    selectedIdx = -1;
+    redrawAll();
+  }
+
+  let toastTimer: number | null = null;
+
+  function showToast(msg: string): void {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('toast-hidden');
+    if (toastTimer !== null) clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      el.classList.add('toast-hidden');
+      toastTimer = null;
+    }, 2500);
+  }
+
+  function mergeSelectedRegions(): void {
+    if (currentGrid === null || selectedIdx < 0 || secondSelectedIdx < 0) return;
+    const a = regions[selectedIdx];
+    const b = regions[secondSelectedIdx];
+    const reason = mergeFailureReason(a, b);
+    if (reason !== null) {
+      showToast(reason);
+      return;
+    }
+    const color = a.color;
+    mergeRegions(currentGrid, regions, selectedIdx, secondSelectedIdx, color);
+    refreshRegions();
+    selectedIdx = -1;
+    secondSelectedIdx = -1;
+    redrawAll();
+  }
+
+  function deleteSelectedRegion(): void {
+    if (currentGrid === null || selectedIdx < 0 || selectedIdx >= regions.length) return;
+    applyRegionColor(currentGrid, regions[selectedIdx], 'white');
+    redrawAll();
+  }
+
   function updateStepIndicator(): void {
     if (mondrianState !== null && mondrianState.phase === 'splitting') {
       stepIndicator.textContent = `Building • ${mondrianState.rects.length} rects`;
@@ -191,8 +336,11 @@ async function init(): Promise<void> {
     const params = readParams();
     currentGrid = generateMondrianGrid(gridSize, params);
     mondrianState = null;
+    selectedIdx = -1;
+    secondSelectedIdx = -1;
+    refreshRegions();
     if (DEBUG) { console.log(`[main] one-shot #${genCount}:`); dumpGrid(currentGrid); }
-    drawGrid(graphics, currentGrid, canvasSize, canvasSize);
+    redrawAll();
     updateStepIndicator();
   }
 
@@ -205,8 +353,10 @@ async function init(): Promise<void> {
 
     mondrianState = initMondrianState(gridSize, readParams());
     currentGrid = mondrianState.grid;
+    selectedIdx = -1;
+    secondSelectedIdx = -1;
     if (DEBUG) console.log(`[main] build #${genCount} started`);
-    drawGrid(graphics, currentGrid, canvasSize, canvasSize);
+    redrawAll();
     updateStepIndicator();
   }
 
@@ -215,7 +365,7 @@ async function init(): Promise<void> {
     if (mondrianState === null) return false;
     const more = stepMondrian(mondrianState);
     currentGrid = mondrianState.grid;
-    drawGrid(graphics, currentGrid, canvasSize, canvasSize);
+    redrawAll();
     updateStepIndicator();
     return more;
   }
@@ -236,6 +386,7 @@ async function init(): Promise<void> {
         mondrianState = null;
         isPlaying = false;
         setPauseIcon(false);
+        refreshRegions();
         updateStepIndicator();
         if (DEBUG) { console.log(`[main] build #${genCount} complete:`); dumpGrid(currentGrid!); }
       }
@@ -326,12 +477,36 @@ async function init(): Promise<void> {
       setPauseIcon(false);
       generateOneShot();
     }
+    // Keyboard shortcuts for editing
+    if (selectedIdx >= 0) {
+      if (e.key === 'r') changeSelectedColor('red');
+      else if (e.key === 'b') changeSelectedColor('blue');
+      else if (e.key === 'y') changeSelectedColor('yellow');
+      else if (e.key === 'w') changeSelectedColor('white');
+      else if (e.key === 'k') changeSelectedColor('black');
+      else if (e.key === 'h') splitSelectedRegion(true);
+      else if (e.key === 'v') splitSelectedRegion(false);
+      else if (e.key === 'm' && secondSelectedIdx >= 0) mergeSelectedRegions();
+      else if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelectedRegion(); }
+      else if (e.key === 'Escape') { selectedIdx = -1; secondSelectedIdx = -1; redrawAll(); }
+    }
   });
+
+  // Editing toolbar button handlers
+  document.getElementById('btn-color-red')?.addEventListener('click', () => changeSelectedColor('red'));
+  document.getElementById('btn-color-blue')?.addEventListener('click', () => changeSelectedColor('blue'));
+  document.getElementById('btn-color-yellow')?.addEventListener('click', () => changeSelectedColor('yellow'));
+  document.getElementById('btn-color-white')?.addEventListener('click', () => changeSelectedColor('white'));
+  document.getElementById('btn-color-black')?.addEventListener('click', () => changeSelectedColor('black'));
+  document.getElementById('btn-split-h')?.addEventListener('click', () => splitSelectedRegion(true));
+  document.getElementById('btn-split-v')?.addEventListener('click', () => splitSelectedRegion(false));
+  document.getElementById('btn-merge')?.addEventListener('click', mergeSelectedRegions);
+  document.getElementById('btn-delete')?.addEventListener('click', deleteSelectedRegion);
 
   window.addEventListener('resize', () => {
     resize();
     if (currentGrid !== null) {
-      drawGrid(graphics, currentGrid, canvasSize, canvasSize);
+      redrawAll();
     }
   });
 
