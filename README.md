@@ -1,18 +1,16 @@
 # Mondrian Simulator
 
-A static site that generates Piet Mondrian-style compositions using a cellular automata engine. The CA evolves a grid of lines and color blocks to produce visually balanced abstract geometric art.
+A browser-based tool that generates Piet Mondrian-style compositions using recursive subdivision, strategic color assignment, and visual weight balancing.
 
 ## How it works
 
-The pipeline runs in three phases:
+1. **Recursive subdivision** — A grid starts as a single rectangle. Larger rectangles are iteratively split by horizontal or vertical lines, biased toward aesthetically pleasing proportions (golden ratio, 2:3, 3:5, etc.).
 
-1. **Line network formation** — Contiguous line segments are seeded randomly, then a CA iterates to fill gaps, kill isolated segments, and form a connected rectilinear grid with thin and thick lines.
+2. **T-junctions** — Line segments extend into adjacent rectangles to create T-shaped line terminations, a hallmark of Mondrian's style.
 
-2. **Region coloring** — Rectangular regions bounded by lines are flood-filled and assigned colors (red, blue, yellow, black, gray, white) with adjacency constraints and area-proportional distribution. White space dominates (~60%+).
+3. **Strategic coloring** — Red goes to the largest non-edge rectangles, blue and yellow to medium edge-adjacent ones, black to a single small accent. White fills the rest.
 
-3. **Refinement** — Orphan lines that don't intersect perpendicular lines are removed.
-
-Each run produces a unique composition. The underlying grid size and color intensity are adjustable.
+4. **Visual weight balancing** — Colors are swapped to pull the visual center of mass toward the geometric center, preventing lopsided compositions.
 
 ## Run
 
@@ -23,23 +21,49 @@ npm run dev      # http://localhost:5173
 
 ## Controls
 
-- **Space** or **Generate** — new random composition
-- **Grid** slider — grid density (12–24)
-- **Color** slider — color saturation (0–100%)
+| Action | Shortcut |
+|--------|----------|
+| New composition | Space or **Generate** button |
+| Play/pause build animation | **Play/Pause** button |
+| Toggle settings menu | **Settings** button |
+
+### Settings
+
+| Parameter | Range | Default | Description |
+|-----------|-------|---------|-------------|
+| Grid | 12–200 | 50 | Grid resolution |
+| Speed | 1–10× | 4× | Animation playback speed |
+| Rects | 5–40 | 15 | Target number of rectangles |
+| Min Rect | 2–8 | 3 | Minimum rectangle dimension in cells |
+| Line Gap | 1–6 | 2 | Minimum gap between parallel lines |
+| Thick Line | 0–1 | 0 | Probability of drawing thicker black lines |
+| T-Junction | 0–1 | 0.45 | How aggressively lines form T-junctions |
+| Proportion | 0–1 | 0.65 | Bias toward golden-ratio proportions (0 = random, 1 = strict) |
+
+### Editing
+
+Click on a colored rectangle to select it. The edit toolbar appears at the top.
+
+| Action | Shortcut / Input |
+|--------|------------------|
+| Change color | **R** / **B** / **Y** / **W** / **K** or click swatch |
+| Split horizontally | **H** or Split H button |
+| Split vertically | **V** or Split V button |
+| Merge two regions | Shift+click second region, then **M** or Merge button |
+| Delete (→ white) | **Delete** / **Backspace** or Delete button |
+| Deselect | **Escape** or click a line |
 
 ## Debug mode
 
-Append `?debug=1` to the URL and open the browser console. The grid is printed as ASCII art at each pipeline stage:
+Append `?debug=1` to the URL and open the browser console to see the grid printed as ASCII art:
 
 ```
 . . . . | . . . . | . . . .
 - - - - + - - - - + - - - -
 . . . . | R R R . | . . . .
-. . . . | R R R . | . . . .
-= = = = # = = = = # = = = =
 ```
 
-Legend: `.` white, `R` red, `B` blue, `Y` yellow, `K` black, `G` gray, `-` thin hLine, `=` thick hLine, `|` thin vLine, `+` thin intersection, `#` thick intersection.
+Legend: `.` white, `R` red, `B` blue, `Y` yellow, `K` black, `-` thin hLine, `=` thick hLine, `|` thin vLine, `+` thin intersection, `#` thick intersection.
 
 ## Build
 
