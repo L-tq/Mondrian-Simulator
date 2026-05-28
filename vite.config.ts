@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  root: '.',
+  base: '/Mondrian-Simulator/',
   build: {
-    outDir: 'dist',
+    outDir: 'docs',
   },
 });

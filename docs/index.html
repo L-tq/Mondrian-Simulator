@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mondrian Simulator</title>
+  <script type="module" crossorigin src="/Mondrian-Simulator/assets/index-DmhuYWBk.js"></script>
+  <link rel="stylesheet" crossorigin href="/Mondrian-Simulator/assets/index-FaCqJ9dR.css">
+</head>
+<body>
+  <div id="pixi-container"></div>
+
+  <div id="controls">
+    <button id="btn-generate" title="Generate">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+      </svg>
+    </button>
+    <button id="btn-pause" title="Pause">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="4" width="4" height="16" />
+        <rect x="14" y="4" width="4" height="16" />
+      </svg>
+    </button>
+    <button id="btn-settings" title="Settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    </button>
+  </div>
+
+  <div id="settings-dropdown" class="hidden">
+    <label class="control-group">
+      <span>Grid</span>
+      <input type="range" id="grid-size" min="12" max="200" value="50" step="1" />
+      <span id="grid-size-label">50</span>
+    </label>
+    <label class="control-group">
+      <span>Speed</span>
+      <input type="range" id="playback-speed" min="1" max="10" value="4" step="1" />
+      <span id="playback-speed-label">4×</span>
+    </label>
+    <label class="control-group">
+      <span>Rects</span>
+      <input type="range" id="rect-count" min="5" max="40" value="15" step="1" />
+      <span id="rect-count-label">15</span>
+    </label>
+    <div class="settings-sep"></div>
+    <label class="control-group" title="Minimum rectangle dimension in cells">
+      <span>Min Rect <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="min-rect-size" min="2" max="8" value="3" step="1" />
+      <span id="min-rect-size-label">3</span>
+    </label>
+    <label class="control-group" title="Minimum gap in cells between parallel lines">
+      <span>Line Gap <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="line-gap" min="1" max="6" value="2" step="1" />
+      <span id="line-gap-label">2</span>
+    </label>
+    <label class="control-group" title="Probability of drawing thicker black lines">
+      <span>Thick Line <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="line-thick-chance" min="0" max="1" value="0" step="0.05" />
+      <span id="line-thick-chance-label">0</span>
+    </label>
+    <label class="control-group" title="How aggressively lines extend into adjacent rectangles to form T-junctions">
+      <span>T-Junction <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="tj-junction-rate" min="0" max="1" value="0.45" step="0.05" />
+      <span id="tj-junction-rate-label">0.45</span>
+    </label>
+    <label class="control-group" title="Bias toward aesthetically pleasing proportions — golden ratio, 2:3, 3:5, etc. (0 = random, 1 = strict)">
+      <span>Proportion <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="proportional-bias" min="0" max="1" value="0.65" step="0.05" />
+      <span id="proportional-bias-label">0.65</span>
+    </label>
+  </div>
+
+  <div id="step-indicator" class="step-hidden"></div>
+
+  <div id="toast" class="toast-hidden"></div>
+
+  <div id="edit-toolbar" class="hidden">
+    <span class="toolbar-label">Edit</span>
+    <button id="btn-color-red" class="swatch swatch-red" title="Red (R)"></button>
+    <button id="btn-color-blue" class="swatch swatch-blue" title="Blue (B)"></button>
+    <button id="btn-color-yellow" class="swatch swatch-yellow" title="Yellow (Y)"></button>
+    <button id="btn-color-white" class="swatch swatch-white" title="White (W)"></button>
+    <button id="btn-color-black" class="swatch swatch-black" title="Black (K)"></button>
+    <span class="toolbar-sep"></span>
+    <button id="btn-split-h" class="toolbar-btn" title="Split Horizontal (H)">⬌</button>
+    <button id="btn-split-v" class="toolbar-btn" title="Split Vertical (V)">⬍</button>
+    <button id="btn-merge" class="toolbar-btn" title="Merge (Shift+click then M)">⊕</button>
+    <button id="btn-delete" class="toolbar-btn toolbar-delete" title="Delete (Del)">✕</button>
+  </div>
+
+</body>
+</html>

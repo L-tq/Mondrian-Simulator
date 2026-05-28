@@ -65,8 +65,14 @@ Append `?debug=1` to the URL and open the browser console to see the grid printe
 
 Legend: `.` white, `R` red, `B` blue, `Y` yellow, `K` black, `-` thin hLine, `=` thick hLine, `|` thin vLine, `+` thin intersection, `#` thick intersection.
 
-## Build
+## Build & Deploy
 
 ```bash
-npm run build    # outputs to dist/
+npm run build    # TypeScript check + Vite build → docs/
 ```
+
+The build outputs to `docs/`. Commit the `docs/` folder along with `_config.yml` and push to GitHub.
+
+### GitHub Pages
+
+In the repo settings, set **Pages → Source** to "Deploy from a branch", select your branch, and set the folder to `/docs`. GitHub Pages runs Jekyll on `docs/` — the included `_config.yml` keeps Jekyll from processing source files and serves the pre-built static output as-is.

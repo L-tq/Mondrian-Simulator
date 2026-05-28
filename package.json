@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postbuild": "cp _config.yml docs/"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

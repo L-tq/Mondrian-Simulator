@@ -1,0 +1,13 @@
+# Jekyll configuration for Mondrian Simulator
+# Static site pre-built by Vite — Jekyll passes files through unchanged.
+exclude:
+  - node_modules
+  - src
+  - package.json
+  - package-lock.json
+  - tsconfig.json
+  - vite.config.ts
+  - README.md
+  - LICENSE
+  - "*.ts"
+  - dist
