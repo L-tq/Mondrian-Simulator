@@ -78,6 +78,8 @@ html, body {
   padding: 20px 28px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
   z-index: 11;
   transition: opacity 0.2s, transform 0.2s;
 }
@@ -124,14 +126,27 @@ html, body {
 #grid-size-label,
 #playback-speed-label,
 #rect-count-label,
-#red-rate-label,
-#blue-rate-label,
-#yellow-rate-label,
-#white-rate-label,
-#black-rate-label {
+#min-rect-size-label,
+#line-gap-label,
+#line-thick-chance-label,
+#tj-junction-rate-label,
+#proportional-bias-label {
   color: #fff;
-  min-width: 20px;
+  min-width: 28px;
   text-align: center;
+}
+
+.tip-icon {
+  font-size: 9px;
+  opacity: 0.35;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.settings-sep {
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+  margin: -4px 0;
 }
 
 #step-indicator {

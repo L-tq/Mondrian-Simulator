@@ -15,37 +15,37 @@ const dropdown = document.getElementById('settings-dropdown') as HTMLDivElement;
 const sliderGrid = document.getElementById('grid-size') as HTMLInputElement;
 const sliderSpeed = document.getElementById('playback-speed') as HTMLInputElement;
 const sliderRectCount = document.getElementById('rect-count') as HTMLInputElement;
-const sliderRedRate = document.getElementById('red-rate') as HTMLInputElement;
-const sliderBlueRate = document.getElementById('blue-rate') as HTMLInputElement;
-const sliderYellowRate = document.getElementById('yellow-rate') as HTMLInputElement;
-const sliderWhiteRate = document.getElementById('white-rate') as HTMLInputElement;
-const sliderBlackRate = document.getElementById('black-rate') as HTMLInputElement;
 const gridLabel = document.getElementById('grid-size-label') as HTMLSpanElement;
 const speedLabel = document.getElementById('playback-speed-label') as HTMLSpanElement;
 const rectCountLabel = document.getElementById('rect-count-label') as HTMLSpanElement;
-const redRateLabel = document.getElementById('red-rate-label') as HTMLSpanElement;
-const blueRateLabel = document.getElementById('blue-rate-label') as HTMLSpanElement;
-const yellowRateLabel = document.getElementById('yellow-rate-label') as HTMLSpanElement;
-const whiteRateLabel = document.getElementById('white-rate-label') as HTMLSpanElement;
-const blackRateLabel = document.getElementById('black-rate-label') as HTMLSpanElement;
 const stepIndicator = document.getElementById('step-indicator') as HTMLDivElement;
+const sliderMinRectSize = document.getElementById('min-rect-size') as HTMLInputElement;
+const sliderLineGap = document.getElementById('line-gap') as HTMLInputElement;
+const sliderLineThickChance = document.getElementById('line-thick-chance') as HTMLInputElement;
+const sliderTJunctionRate = document.getElementById('tj-junction-rate') as HTMLInputElement;
+const sliderProportionalBias = document.getElementById('proportional-bias') as HTMLInputElement;
+const minRectSizeLabel = document.getElementById('min-rect-size-label') as HTMLSpanElement;
+const lineGapLabel = document.getElementById('line-gap-label') as HTMLSpanElement;
+const lineThickChanceLabel = document.getElementById('line-thick-chance-label') as HTMLSpanElement;
+const tjJunctionRateLabel = document.getElementById('tj-junction-rate-label') as HTMLSpanElement;
+const proportionalBiasLabel = document.getElementById('proportional-bias-label') as HTMLSpanElement;
 
 // ---------------------------------------------------------------------------
 // Cookie helpers
 // ---------------------------------------------------------------------------
 
-const COOKIE_NAME = 'mondrian-settings-v2';
+const COOKIE_NAME = 'mondrian-settings-v3';
 const COOKIE_DAYS = 365;
 
 interface Settings {
   gridSize: number;
   speed: number;
   rectCount: number;
-  redRate: number;
-  blueRate: number;
-  yellowRate: number;
-  whiteRate: number;
-  blackRate: number;
+  minRectSize: number;
+  lineGap: number;
+  lineThickChance: number;
+  tJunctionRate: number;
+  proportionalBias: number;
 }
 
 function saveSettings(): void {
@@ -53,11 +53,11 @@ function saveSettings(): void {
     gridSize: parseInt(sliderGrid.value, 10),
     speed: parseInt(sliderSpeed.value, 10),
     rectCount: parseInt(sliderRectCount.value, 10),
-    redRate: parseInt(sliderRedRate.value, 10),
-    blueRate: parseInt(sliderBlueRate.value, 10),
-    yellowRate: parseInt(sliderYellowRate.value, 10),
-    whiteRate: parseInt(sliderWhiteRate.value, 10),
-    blackRate: parseInt(sliderBlackRate.value, 10),
+    minRectSize: parseInt(sliderMinRectSize.value, 10),
+    lineGap: parseInt(sliderLineGap.value, 10),
+    lineThickChance: parseFloat(sliderLineThickChance.value),
+    tJunctionRate: parseFloat(sliderTJunctionRate.value),
+    proportionalBias: parseFloat(sliderProportionalBias.value),
   };
   const expires = new Date(Date.now() + COOKIE_DAYS * 864e5).toUTCString();
   document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(s))}; expires=${expires}; path=/; SameSite=Lax`;
@@ -77,41 +77,41 @@ function applySettings(s: Settings): void {
   sliderGrid.value = String(s.gridSize);
   sliderSpeed.value = String(s.speed);
   sliderRectCount.value = String(s.rectCount ?? 15);
-  sliderRedRate.value = String(s.redRate ?? 20);
-  sliderBlueRate.value = String(s.blueRate ?? 20);
-  sliderYellowRate.value = String(s.yellowRate ?? 20);
-  sliderWhiteRate.value = String(s.whiteRate ?? 30);
-  sliderBlackRate.value = String(s.blackRate ?? 10);
   gridLabel.textContent = String(s.gridSize);
   speedLabel.textContent = s.speed + '×';
   rectCountLabel.textContent = String(s.rectCount ?? 15);
-  redRateLabel.textContent = String(s.redRate ?? 20);
-  blueRateLabel.textContent = String(s.blueRate ?? 20);
-  yellowRateLabel.textContent = String(s.yellowRate ?? 20);
-  whiteRateLabel.textContent = String(s.whiteRate ?? 30);
-  blackRateLabel.textContent = String(s.blackRate ?? 10);
+  sliderMinRectSize.value = String(s.minRectSize ?? 3);
+  minRectSizeLabel.textContent = String(s.minRectSize ?? 3);
+  sliderLineGap.value = String(s.lineGap ?? 2);
+  lineGapLabel.textContent = String(s.lineGap ?? 2);
+  sliderLineThickChance.value = String(s.lineThickChance ?? 0);
+  lineThickChanceLabel.textContent = String(s.lineThickChance ?? 0);
+  sliderTJunctionRate.value = String(s.tJunctionRate ?? 0.45);
+  tjJunctionRateLabel.textContent = String(s.tJunctionRate ?? 0.45);
+  sliderProportionalBias.value = String(s.proportionalBias ?? 0.65);
+  proportionalBiasLabel.textContent = String(s.proportionalBias ?? 0.65);
 }
 
 const saved = loadSettings();
 if (saved) {
   applySettings(saved);
 } else {
-  sliderGrid.value = '16';
+  sliderGrid.value = '50';
   sliderSpeed.value = '4';
   sliderRectCount.value = '15';
-  sliderRedRate.value = '20';
-  sliderBlueRate.value = '20';
-  sliderYellowRate.value = '20';
-  sliderWhiteRate.value = '30';
-  sliderBlackRate.value = '10';
-  gridLabel.textContent = '16';
+  gridLabel.textContent = '50';
   speedLabel.textContent = '4×';
   rectCountLabel.textContent = '15';
-  redRateLabel.textContent = '20';
-  blueRateLabel.textContent = '20';
-  yellowRateLabel.textContent = '20';
-  whiteRateLabel.textContent = '30';
-  blackRateLabel.textContent = '10';
+  sliderMinRectSize.value = '3';
+  sliderLineGap.value = '2';
+  sliderLineThickChance.value = '0';
+  sliderTJunctionRate.value = '0.45';
+  sliderProportionalBias.value = '0.65';
+  minRectSizeLabel.textContent = '3';
+  lineGapLabel.textContent = '2';
+  lineThickChanceLabel.textContent = '0';
+  tjJunctionRateLabel.textContent = '0.45';
+  proportionalBiasLabel.textContent = '0.65';
 }
 
 let canvasSize = 0;
@@ -119,12 +119,12 @@ let currentGrid: Grid<LifeColor> | null = null;
 let mondrianState: MondrianState | null = null;
 let isPlaying = false;
 let genCount = 0;
+let currentSeed = 0;
 let animTimer: number | null = null;
 let regions: ColoredRect[] = [];
 let selectedIdx: number = -1;
 let secondSelectedIdx: number = -1;
 let highlightGraphics: Graphics | null = null;
-let gridPixelSize = 0; // canvasSize passed to draw functions
 
 const app = new Application();
 
@@ -171,14 +171,11 @@ async function init(): Promise<void> {
   function readParams(): MondrianParams {
     return {
       targetRectCount: parseInt(sliderRectCount.value, 10),
-      minRectSize: 3,
-      lineGap: 2,
-      lineThickChance: 0,
-      redRate: parseInt(sliderRedRate.value, 10) / 100,
-      blueRate: parseInt(sliderBlueRate.value, 10) / 100,
-      yellowRate: parseInt(sliderYellowRate.value, 10) / 100,
-      whiteRate: parseInt(sliderWhiteRate.value, 10) / 100,
-      blackRate: parseInt(sliderBlackRate.value, 10) / 100,
+      minRectSize: parseInt(sliderMinRectSize.value, 10),
+      lineGap: parseInt(sliderLineGap.value, 10),
+      lineThickChance: parseFloat(sliderLineThickChance.value),
+      tJunctionRate: parseFloat(sliderTJunctionRate.value),
+      proportionalBias: parseFloat(sliderProportionalBias.value),
     };
   }
 
@@ -318,6 +315,14 @@ async function init(): Promise<void> {
     if (mondrianState !== null && mondrianState.phase === 'splitting') {
       stepIndicator.textContent = `Building • ${mondrianState.rects.length} rects`;
       stepIndicator.classList.remove('step-hidden');
+    } else if (mondrianState !== null && mondrianState.phase === 'coloring') {
+      const total = mondrianState.paintQueue.length;
+      const done = mondrianState.colorIndex;
+      stepIndicator.textContent = `Painting • ${done}/${total}`;
+      stepIndicator.classList.remove('step-hidden');
+    } else if (mondrianState !== null && mondrianState.phase === 'balancing') {
+      stepIndicator.textContent = `Balancing • ${mondrianState.balanceTried}/10`;
+      stepIndicator.classList.remove('step-hidden');
     } else if (currentGrid !== null) {
       stepIndicator.textContent = `#${genCount}`;
       stepIndicator.classList.remove('step-hidden');
@@ -333,8 +338,9 @@ async function init(): Promise<void> {
     resize();
     genCount++;
 
+    currentSeed = (Math.random() * 2147483647) | 0;
     const params = readParams();
-    currentGrid = generateMondrianGrid(gridSize, params);
+    currentGrid = generateMondrianGrid(gridSize, params, currentSeed);
     mondrianState = null;
     selectedIdx = -1;
     secondSelectedIdx = -1;
@@ -349,13 +355,12 @@ async function init(): Promise<void> {
     gridLabel.textContent = String(gridSize);
     saveSettings();
     resize();
-    genCount++;
 
-    mondrianState = initMondrianState(gridSize, readParams());
+    mondrianState = initMondrianState(gridSize, readParams(), currentSeed);
     currentGrid = mondrianState.grid;
     selectedIdx = -1;
     secondSelectedIdx = -1;
-    if (DEBUG) console.log(`[main] build #${genCount} started`);
+    if (DEBUG) console.log(`[main] build replay #${genCount} (seed ${currentSeed}) started`);
     redrawAll();
     updateStepIndicator();
   }
@@ -382,11 +387,12 @@ async function init(): Promise<void> {
       if (stepBuild()) {
         scheduleTick();
       } else {
-        // Build complete
+        // Build complete (coloring + line extension done by stepMondrian)
         mondrianState = null;
         isPlaying = false;
         setPauseIcon(false);
         refreshRegions();
+        redrawAll();
         updateStepIndicator();
         if (DEBUG) { console.log(`[main] build #${genCount} complete:`); dumpGrid(currentGrid!); }
       }
@@ -435,24 +441,24 @@ async function init(): Promise<void> {
     rectCountLabel.textContent = sliderRectCount.value;
   });
 
-  sliderRedRate.addEventListener('input', () => {
-    redRateLabel.textContent = sliderRedRate.value;
+  sliderMinRectSize.addEventListener('input', () => {
+    minRectSizeLabel.textContent = sliderMinRectSize.value;
   });
 
-  sliderBlueRate.addEventListener('input', () => {
-    blueRateLabel.textContent = sliderBlueRate.value;
+  sliderLineGap.addEventListener('input', () => {
+    lineGapLabel.textContent = sliderLineGap.value;
   });
 
-  sliderYellowRate.addEventListener('input', () => {
-    yellowRateLabel.textContent = sliderYellowRate.value;
+  sliderLineThickChance.addEventListener('input', () => {
+    lineThickChanceLabel.textContent = parseFloat(sliderLineThickChance.value).toFixed(2);
   });
 
-  sliderWhiteRate.addEventListener('input', () => {
-    whiteRateLabel.textContent = sliderWhiteRate.value;
+  sliderTJunctionRate.addEventListener('input', () => {
+    tjJunctionRateLabel.textContent = parseFloat(sliderTJunctionRate.value).toFixed(2);
   });
 
-  sliderBlackRate.addEventListener('input', () => {
-    blackRateLabel.textContent = sliderBlackRate.value;
+  sliderProportionalBias.addEventListener('input', () => {
+    proportionalBiasLabel.textContent = parseFloat(sliderProportionalBias.value).toFixed(2);
   });
 
   btnSettings.addEventListener('click', (e) => {
@@ -510,6 +516,7 @@ async function init(): Promise<void> {
     }
   });
 
+  setPauseIcon(false);
   generateOneShot();
 }
 

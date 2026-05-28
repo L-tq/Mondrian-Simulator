@@ -1,6 +1,22 @@
 import { Grid } from './automata';
 
 // ---------------------------------------------------------------------------
+// Seeded PRNG (mulberry32)
+// ---------------------------------------------------------------------------
+
+export type RNG = () => number;
+
+export function createRNG(seed: number): RNG {
+  let s = seed | 0;
+  return function mulberry32(): number {
+    s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -12,11 +28,10 @@ export interface MondrianParams {
   /** Minimum gap (in cells) between parallel lines. Default 1, use 2+ to prevent thick lines. */
   lineGap: number;
   lineThickChance: number;
-  redRate: number;
-  blueRate: number;
-  yellowRate: number;
-  whiteRate: number;
-  blackRate: number;
+  /** 0-1 probability of extending line segments into adjacent rectangles to create T-junctions. */
+  tJunctionRate: number;
+  /** 0-1 bias toward aesthetically pleasing proportions (golden ratio, 2:3, etc.) vs random. */
+  proportionalBias: number;
 }
 // ---------------------------------------------------------------------------
 // Helpers
@@ -26,23 +41,7 @@ interface Rect {
   r: number; c: number; h: number; w: number;
 }
 
-function pickColor(params: MondrianParams): LifeColor | null {
-  const r = Math.max(0, params.redRate);
-  const b = Math.max(0, params.blueRate);
-  const y = Math.max(0, params.yellowRate);
-  const w = Math.max(0, params.whiteRate);
-  const k = Math.max(0, params.blackRate);
-  const total = r + b + y + w + k;
-  if (total <= 0) return null;
-  let v = Math.random() * total;
-  if ((v -= r) < 0) return 'red';
-  if ((v -= b) < 0) return 'blue';
-  if ((v -= y) < 0) return 'yellow';
-  if ((v -= w) < 0) return 'white';
-  return 'black';
-}
-
-function pickRectToSplit(rects: Rect[], minSize: number): number {
+function pickRectToSplit(rects: Rect[], minSize: number, rng: RNG): number {
   const candidates: number[] = [];
   for (let i = 0; i < rects.length; i++) {
     if (rects[i].h >= minSize * 2 + 1 || rects[i].w >= minSize * 2 + 1) {
@@ -59,7 +58,7 @@ function pickRectToSplit(rects: Rect[], minSize: number): number {
     weights.push(area);
     totalArea += area;
   }
-  let v = Math.random() * totalArea;
+  let v = rng() * totalArea;
   for (let j = 0; j < candidates.length; j++) {
     v -= weights[j];
     if (v <= 0) return candidates[j];
@@ -118,19 +117,148 @@ function isVertPositionValid(grid: Grid<LifeColor>, lineC: number, r0: number, r
 }
 
 // ---------------------------------------------------------------------------
+// Proportional scoring for aesthetically pleasing splits
+// ---------------------------------------------------------------------------
+
+/** Good ratios in Mondrian's work: golden ratio, simple fractions. */
+const GOOD_RATIOS = [1.0, 0.618, 0.5, 2/3, 3/5, 3/8];
+
+/** Score how close a ratio is to aesthetically pleasing proportions. 1 = perfect, 0 = poor. */
+function proportionScore(a: number, b: number): number {
+  if (a <= 0 || b <= 0) return 0;
+  const r = Math.min(a, b) / Math.max(a, b);
+  let best = Infinity;
+  for (const gr of GOOD_RATIOS) {
+    const d = Math.abs(r - gr);
+    if (d < best) best = d;
+  }
+  return Math.max(0, 1 - best / 0.25);
+}
+
+/** Pick a position from candidates, weighted by proportion score when bias > 0. */
+function pickWeightedPosition(candidates: number[], minPos: number, maxPos: number, bias: number, rng: RNG): number {
+  if (bias <= 0 || candidates.length <= 1) {
+    return candidates[Math.floor(rng() * candidates.length)];
+  }
+  const weights = candidates.map(pos => {
+    const sizeA = pos - minPos;
+    const sizeB = maxPos - pos;
+    const score = proportionScore(sizeA, sizeB);
+    return 1 - bias + bias * score; // blend: 1-bias random, bias proportional
+  });
+  let total = 0;
+  for (const w of weights) total += w;
+  let v = rng() * total;
+  for (let i = 0; i < candidates.length; i++) {
+    v -= weights[i];
+    if (v <= 0) return candidates[i];
+  }
+  return candidates[candidates.length - 1];
+}
+
+// ---------------------------------------------------------------------------
+// Line extension — T-junctions
+// ---------------------------------------------------------------------------
+
+/**
+ * Extend existing line segments into adjacent colored rectangles to create
+ * T-junctions. A line extends until it hits a perpendicular line or the frame edge.
+ * Only original (pre-extension) line segments are considered for extension to avoid
+ * cascading artifacts.
+ */
+export function extendLines(grid: Grid<LifeColor>, rate: number, rng: RNG): void {
+  if (rate <= 0) return;
+  const size = grid.rows;
+
+  // Snapshot original line cells so extensions don't cascade
+  const original: boolean[][] = Array.from({ length: size }, (_, r) =>
+    Array.from({ length: size }, (_, c) => grid.get(r, c) === 'line'),
+  );
+
+  // Extend horizontal lines left/right (only from original segments)
+  for (let r = 0; r < size; r++) {
+    let c = 0;
+    while (c < size) {
+      if (!original[r][c]) { c++; continue; }
+      const c0 = c;
+      while (c < size && original[r][c]) c++;
+      const c1 = c;
+      if (c1 - c0 < 2) continue; // skip single-cell artifacts
+
+      // Try extend left
+      if (c0 > 0 && grid.get(r, c0 - 1) !== 'line' && rng() < rate) {
+        let ec = c0 - 1;
+        while (ec >= 0 && grid.get(r, ec) !== 'line') {
+          grid.set(r, ec, 'line');
+          ec--;
+        }
+      }
+      // Try extend right
+      if (c1 < size && grid.get(r, c1) !== 'line' && rng() < rate) {
+        let ec = c1;
+        while (ec < size && grid.get(r, ec) !== 'line') {
+          grid.set(r, ec, 'line');
+          ec++;
+        }
+      }
+    }
+  }
+
+  // Extend vertical lines up/down (only from original segments)
+  for (let c = 0; c < size; c++) {
+    let r = 0;
+    while (r < size) {
+      if (!original[r][c]) { r++; continue; }
+      const r0 = r;
+      while (r < size && original[r][c]) r++;
+      const r1 = r;
+      if (r1 - r0 < 2) continue; // skip single-cell artifacts
+
+      // Try extend up
+      if (r0 > 0 && grid.get(r0 - 1, c) !== 'line' && rng() < rate) {
+        let er = r0 - 1;
+        while (er >= 0 && grid.get(er, c) !== 'line') {
+          grid.set(er, c, 'line');
+          er--;
+        }
+      }
+      // Try extend down
+      if (r1 < size && grid.get(r1, c) !== 'line' && rng() < rate) {
+        let er = r1;
+        while (er < size && grid.get(er, c) !== 'line') {
+          grid.set(er, c, 'line');
+          er++;
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Step-by-step generator
 // ---------------------------------------------------------------------------
 
 export interface MondrianState {
   grid: Grid<LifeColor>;
   rects: Rect[];
-  phase: 'splitting' | 'done';
+  phase: 'splitting' | 'coloring' | 'balancing' | 'done';
   params: MondrianParams;
   minRSize: number;
   gap: number;
+  rng: RNG;
+  seed: number;
+  /** Color assigned to each rect (populated when phase transitions to 'coloring'). */
+  assignedColors: (LifeColor | null)[];
+  /** Indices of non-white rects to animate during 'coloring' phase. */
+  paintQueue: number[];
+  /** Index into paintQueue of the next rect to flood-fill. */
+  colorIndex: number;
+  /** Number of swap attempts made during 'balancing' phase. */
+  balanceTried: number;
 }
 
-export function initMondrianState(size: number, params: MondrianParams): MondrianState {
+export function initMondrianState(size: number, params: MondrianParams, seed?: number): MondrianState {
+  const s = seed ?? (Math.random() * 2147483647) | 0;
   return {
     grid: new Grid<LifeColor>(size, size, 'empty'),
     rects: [{ r: 0, c: 0, h: size, w: size }],
@@ -138,18 +266,26 @@ export function initMondrianState(size: number, params: MondrianParams): Mondria
     params,
     minRSize: Math.max(2, Math.round(params.minRectSize), Math.round(params.lineGap) + 1),
     gap: Math.max(1, Math.round(params.lineGap)),
+    rng: createRNG(s),
+    seed: s,
+    assignedColors: [],
+    paintQueue: [],
+    colorIndex: 0,
+    balanceTried: 0,
   };
 }
 
-/** Perform one split or the final flood-fill. Returns true if more steps remain. */
+/** Perform one split, coloring step, or balancing step. Returns true if more steps remain. */
 export function stepMondrian(state: MondrianState): boolean {
   if (state.phase === 'done') return false;
+  if (state.phase === 'coloring') return stepColoring(state);
+  if (state.phase === 'balancing') return stepBalancing(state);
 
   if (state.rects.length >= state.params.targetRectCount) {
     return finishMondrian(state);
   }
 
-  const idx = pickRectToSplit(state.rects, state.minRSize);
+  const idx = pickRectToSplit(state.rects, state.minRSize, state.rng);
   if (idx < 0) return finishMondrian(state);
 
   const rect = state.rects[idx];
@@ -169,7 +305,7 @@ export function stepMondrian(state: MondrianState): boolean {
   if (canSplitH) prefs.push('h');
   if (canSplitV) prefs.push('v');
   // Shuffle
-  if (prefs.length === 2 && Math.random() < 0.5) {
+  if (prefs.length === 2 && state.rng() < 0.5) {
     [prefs[0], prefs[1]] = [prefs[1], prefs[0]];
   }
 
@@ -187,14 +323,14 @@ export function stepMondrian(state: MondrianState): boolean {
       }
       if (candidates.length === 0) continue;
 
-      const linePos = candidates[Math.floor(Math.random() * candidates.length)];
+      const linePos = pickWeightedPosition(candidates, minPos, maxPos, state.params.proportionalBias, state.rng);
       const lineR = rect.r + linePos;
       // Thick line: check far side for gap+1 range (lineR+1 is our own cell, lineR+2..lineR+1+gap are externals)
       let thickOk = true;
       for (let d = 1; d <= state.gap; d++) {
         if (rowHasLineSegment(state.grid, lineR + 1 + d, rect.c, rect.c + rect.w)) { thickOk = false; break; }
       }
-      const canThick = Math.random() < state.params.lineThickChance
+      const canThick = state.rng() < state.params.lineThickChance
         && lineR + 1 < rect.r + rect.h - state.minRSize
         && thickOk;
       const thick = canThick ? 2 : 1;
@@ -219,14 +355,14 @@ export function stepMondrian(state: MondrianState): boolean {
       }
       if (candidates.length === 0) continue;
 
-      const linePos = candidates[Math.floor(Math.random() * candidates.length)];
+      const linePos = pickWeightedPosition(candidates, minPos, maxPos, state.params.proportionalBias, state.rng);
       const lineC = rect.c + linePos;
       // Thick line: check far side for gap+1 range (lineC+1 is our own cell, lineC+2..lineC+1+gap are externals)
       let thickOk = true;
       for (let d = 1; d <= state.gap; d++) {
         if (colHasLineSegment(state.grid, lineC + 1 + d, rect.r, rect.r + rect.h)) { thickOk = false; break; }
       }
-      const canThick = Math.random() < state.params.lineThickChance
+      const canThick = state.rng() < state.params.lineThickChance
         && lineC + 1 < rect.c + rect.w - state.minRSize
         && thickOk;
       const thick = canThick ? 2 : 1;
@@ -251,23 +387,223 @@ export function stepMondrian(state: MondrianState): boolean {
 }
 
 function finishMondrian(state: MondrianState): boolean {
-  for (const rect of state.rects) {
-    const color = pickColor(state.params) ?? 'white';
-    for (let r = rect.r; r < rect.r + rect.h; r++) {
-      for (let c = rect.c; c < rect.c + rect.w; c++) {
-        if (state.grid.get(r, c) === 'empty') {
-          state.grid.set(r, c, color);
+  const { rects, params, grid } = state;
+  const size = grid.rows;
+
+  // ---- helpers ----
+  const touchesFrame = (r: Rect): boolean =>
+    r.r === 0 || r.c === 0 || r.r + r.h === size || r.c + r.w === size;
+
+  const area = (r: Rect): number => r.h * r.w;
+
+  // ---- assign colors strategically ----
+  // Sort by area descending
+  const sorted = rects.map((r, i) => ({ r, i })).sort((a, b) => area(b.r) - area(a.r));
+  const assigned = new Array<LifeColor | null>(rects.length).fill(null);
+
+  // Red: assign to 1-2 of the largest non-frame-touching rects
+  let redCount = 0;
+  for (const { r, i } of sorted) {
+    if (redCount >= 2) break;
+    if (assigned[i] !== null) continue;
+    if (touchesFrame(r) && state.rng() < 0.7) continue; // edge breathing
+    if (area(r) < 9) continue; // too small for red
+    const roll = state.rng();
+    const redProb = 0.6 + 0.4 * (area(r) / area(sorted[0].r)); // bigger = more likely red
+    if (roll < redProb) {
+      assigned[i] = 'red';
+      redCount++;
+    }
+  }
+
+  // Blue: assign to 1-2 medium rects, prefer near edges/corners
+  let blueCount = 0;
+  for (const { r, i } of sorted) {
+    if (blueCount >= 2) break;
+    if (assigned[i] !== null) continue;
+    if (area(r) < 6) continue;
+    const edgeBonus = touchesFrame(r) ? 0.3 : 0;
+    if (state.rng() < 0.35 + edgeBonus) {
+      assigned[i] = 'blue';
+      blueCount++;
+    }
+  }
+
+  // Yellow: assign to 1-2 small-medium rects, prefer edges
+  let yellowCount = 0;
+  for (const { r, i } of sorted) {
+    if (yellowCount >= 2) break;
+    if (assigned[i] !== null) continue;
+    if (area(r) < 4) continue;
+    const edgeBonus = touchesFrame(r) ? 0.25 : 0;
+    if (state.rng() < 0.3 + edgeBonus) {
+      assigned[i] = 'yellow';
+      yellowCount++;
+    }
+  }
+
+  // Black: 0-1 very small rect
+  const ascByArea = [...sorted].sort((a, b) => area(a.r) - area(b.r));
+  for (const { r, i } of ascByArea) {
+    if (assigned[i] !== null) continue;
+    if (area(r) > 12) continue;
+    if (touchesFrame(r) && state.rng() < 0.5) continue;
+    if (state.rng() < 0.15) {
+      assigned[i] = 'black';
+      break; // only one black
+    }
+  }
+
+  // Everything else → white
+  for (let i = 0; i < rects.length; i++) {
+    if (assigned[i] === null) assigned[i] = 'white';
+  }
+
+  // Pre-fill white rects (invisible against white background) and
+  // build a paint queue of only non-white rects for the animation.
+  const paintQueue: number[] = [];
+  for (let i = 0; i < rects.length; i++) {
+    if (assigned[i] === 'white') {
+      const rect = rects[i];
+      for (let r = rect.r; r < rect.r + rect.h; r++) {
+        for (let c = rect.c; c < rect.c + rect.w; c++) {
+          if (grid.get(r, c) === 'empty') grid.set(r, c, 'white');
         }
+      }
+    } else {
+      paintQueue.push(i);
+    }
+  }
+
+  state.assignedColors = assigned;
+  state.paintQueue = paintQueue;
+  state.colorIndex = 0;
+  state.phase = 'coloring';
+  return true;
+}
+
+/** Color one non-white rectangle per call. White rects are pre-filled. */
+function stepColoring(state: MondrianState): boolean {
+  const { rects, assignedColors, paintQueue, grid } = state;
+  const qi = state.colorIndex;
+
+  if (qi >= paintQueue.length) {
+    state.phase = 'balancing';
+    state.balanceTried = 0;
+    return true;
+  }
+
+  const rectIdx = paintQueue[qi];
+  const rect = rects[rectIdx];
+  const color = assignedColors[rectIdx]!;
+  for (let r = rect.r; r < rect.r + rect.h; r++) {
+    for (let c = rect.c; c < rect.c + rect.w; c++) {
+      if (grid.get(r, c) === 'empty') {
+        grid.set(r, c, color);
       }
     }
   }
-  state.phase = 'done';
-  return false;
+  state.colorIndex = qi + 1;
+  return state.colorIndex < paintQueue.length;
+}
+
+// ---------------------------------------------------------------------------
+// Visual weight balancing — step-by-step
+// ---------------------------------------------------------------------------
+
+const VISUAL_WEIGHT: Record<string, number> = { red: 1.0, blue: 0.6, yellow: 0.5, black: 0.4, white: 0.05 };
+const MAX_BALANCE_ATTEMPTS = 10;
+
+/** Get the color of a rectangle by reading any non-line cell inside it. */
+function rectColor(grid: Grid<LifeColor>, rect: Rect): LifeColor {
+  for (let r = rect.r; r < rect.r + rect.h; r++) {
+    for (let c = rect.c; c < rect.c + rect.w; c++) {
+      const v = grid.get(r, c);
+      if (v !== 'line') return v;
+    }
+  }
+  return 'white';
+}
+
+/** Fill every non-line cell in a rectangle with a color. */
+function fillRect(grid: Grid<LifeColor>, rect: Rect, color: LifeColor): void {
+  for (let r = rect.r; r < rect.r + rect.h; r++) {
+    for (let c = rect.c; c < rect.c + rect.w; c++) {
+      if (grid.get(r, c) !== 'line') {
+        grid.set(r, c, color);
+      }
+    }
+  }
+}
+
+/** Try one color swap to improve visual balance. Returns true if more attempts remain. */
+function stepBalancing(state: MondrianState): boolean {
+  const { rects, grid } = state;
+  const size = grid.rows;
+  const geoCenterR = (size - 1) / 2;
+  const geoCenterC = (size - 1) / 2;
+
+  function centerOfMass(): { wr: number; wc: number; totalWeight: number } {
+    let wr = 0, wc = 0, tw = 0;
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i];
+      const w = r.h * r.w * (VISUAL_WEIGHT[rectColor(grid, r)] ?? 0.05);
+      wr += (r.r + r.h / 2) * w;
+      wc += (r.c + r.w / 2) * w;
+      tw += w;
+    }
+    return { wr, wc, totalWeight: tw };
+  }
+
+  if (state.balanceTried >= MAX_BALANCE_ATTEMPTS) {
+    extendLines(grid, state.params.tJunctionRate, state.rng);
+    state.phase = 'done';
+    return false;
+  }
+
+  // Pick two rects with different colors
+  let i = 0, j = 0, pickAttempts = 0;
+  do {
+    i = Math.floor(state.rng() * rects.length);
+    j = Math.floor(state.rng() * rects.length);
+    pickAttempts++;
+  } while ((i === j || rectColor(grid, rects[i]) === rectColor(grid, rects[j])) && pickAttempts < 50);
+
+  if (i !== j) {
+    const ci = rectColor(grid, rects[i]);
+    const cj = rectColor(grid, rects[j]);
+    if (ci !== cj) {
+      const before = centerOfMass();
+      const beforeDist = Math.hypot(
+        before.wr / before.totalWeight - geoCenterR,
+        before.wc / before.totalWeight - geoCenterC,
+      );
+
+      // Swap
+      fillRect(grid, rects[i], cj);
+      fillRect(grid, rects[j], ci);
+
+      const after = centerOfMass();
+      const afterDist = Math.hypot(
+        after.wr / after.totalWeight - geoCenterR,
+        after.wc / after.totalWeight - geoCenterC,
+      );
+
+      if (afterDist >= beforeDist) {
+        // Revert
+        fillRect(grid, rects[i], ci);
+        fillRect(grid, rects[j], cj);
+      }
+    }
+  }
+
+  state.balanceTried++;
+  return state.balanceTried < MAX_BALANCE_ATTEMPTS;
 }
 
 /** Convenience wrapper that runs all steps at once. */
-export function generateMondrianGrid(size: number, params: MondrianParams): Grid<LifeColor> {
-  const state = initMondrianState(size, params);
+export function generateMondrianGrid(size: number, params: MondrianParams, seed?: number): Grid<LifeColor> {
+  const state = initMondrianState(size, params, seed);
   while (stepMondrian(state)) { /* run to completion */ }
   return state.grid;
 }
@@ -458,33 +794,39 @@ export function mergeRegions(
   const bBottom = b.r + b.h;
   const bRight = b.c + b.w;
 
-  let merged: ColoredRect | null = null;
+  let cleared = false;
 
-  // A above B, sharing same columns?
+  // A above B
   if (aBottom <= b.r && a.c < bRight && aRight > b.c) {
-    const lineR = aBottom;
-    // Remove the line
     for (let c = Math.max(a.c, b.c); c < Math.min(aRight, bRight); c++) {
-      grid.set(lineR, c, mergedColor);
-      // Also clear adjacent line cells if they exist
-      if (lineR + 1 < grid.rows && grid.get(lineR + 1, c) === 'line') grid.set(lineR + 1, c, mergedColor);
-      if (lineR - 1 >= 0 && grid.get(lineR - 1, c) === 'line') grid.set(lineR - 1, c, mergedColor);
+      for (let dr = aBottom; dr < b.r; dr++) grid.set(dr, c, mergedColor);
     }
-    merged = {
-      r: Math.min(a.r, b.r), c: Math.min(a.c, b.c),
-      h: Math.max(aBottom, bBottom) - Math.min(a.r, b.r),
-      w: Math.max(aRight, bRight) - Math.min(a.c, b.c),
-      color: mergedColor,
-    };
+    cleared = true;
   }
-  // A left of B, sharing same rows?
-  else if (aRight <= b.c && a.r < bBottom && aBottom > b.r) {
-    const lineC = aRight;
-    for (let r = Math.max(a.r, b.r); r < Math.min(aBottom, bBottom); r++) {
-      grid.set(r, lineC, mergedColor);
-      if (lineC + 1 < grid.cols && grid.get(r, lineC + 1) === 'line') grid.set(r, lineC + 1, mergedColor);
-      if (lineC - 1 >= 0 && grid.get(r, lineC - 1) === 'line') grid.set(r, lineC - 1, mergedColor);
+  // B above A
+  else if (bBottom <= a.r && a.c < bRight && aRight > b.c) {
+    for (let c = Math.max(a.c, b.c); c < Math.min(aRight, bRight); c++) {
+      for (let dr = bBottom; dr < a.r; dr++) grid.set(dr, c, mergedColor);
     }
+    cleared = true;
+  }
+  // A left of B
+  else if (aRight <= b.c && a.r < bBottom && aBottom > b.r) {
+    for (let r = Math.max(a.r, b.r); r < Math.min(aBottom, bBottom); r++) {
+      for (let dc = aRight; dc < b.c; dc++) grid.set(r, dc, mergedColor);
+    }
+    cleared = true;
+  }
+  // B left of A
+  else if (bRight <= a.c && a.r < bBottom && aBottom > b.r) {
+    for (let r = Math.max(a.r, b.r); r < Math.min(aBottom, bBottom); r++) {
+      for (let dc = bRight; dc < a.c; dc++) grid.set(r, dc, mergedColor);
+    }
+    cleared = true;
+  }
+
+  let merged: ColoredRect | null = null;
+  if (cleared) {
     merged = {
       r: Math.min(a.r, b.r), c: Math.min(a.c, b.c),
       h: Math.max(aBottom, bBottom) - Math.min(a.r, b.r),
