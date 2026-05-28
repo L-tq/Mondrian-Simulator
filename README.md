@@ -2,6 +2,8 @@
 
 A browser-based tool that generates Piet Mondrian-style compositions using recursive subdivision, strategic color assignment, and visual weight balancing.
 
+Try it here: https://l-tq.github.io/Mondrian-Simulator/
+
 ## How it works
 
 1. **Recursive subdivision** — A grid starts as a single rectangle. Larger rectangles are iteratively split by horizontal or vertical lines, biased toward aesthetically pleasing proportions (golden ratio, 2:3, 3:5, etc.).
