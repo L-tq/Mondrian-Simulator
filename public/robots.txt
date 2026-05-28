@@ -1,0 +1,4 @@
+# https://l-tq.github.io/Mondrian-Simulator/
+User-agent: *
+Allow: /
+Sitemap: https://l-tq.github.io/Mondrian-Simulator/sitemap.xml
