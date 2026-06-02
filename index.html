@@ -109,6 +109,16 @@
       <input type="range" id="line-thick-chance" min="0" max="1" value="0" step="0.05" />
       <span id="line-thick-chance-label">0</span>
     </label>
+    <label class="control-group" title="Thickness of regular lines in cells">
+      <span>Line Width <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="line-width" min="1" max="5" value="1" step="1" />
+      <span id="line-width-label">1</span>
+    </label>
+    <label class="control-group" title="Thickness of thick lines in cells">
+      <span>Thick Width <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="thick-width" min="1" max="5" value="2" step="1" />
+      <span id="thick-width-label">2</span>
+    </label>
     <label class="control-group" title="How aggressively lines extend into adjacent rectangles to form T-junctions">
       <span>T-Junction <span class="tip-icon">ⓘ</span></span>
       <input type="range" id="tj-junction-rate" min="0" max="1" value="0.45" step="0.05" />
@@ -137,17 +147,20 @@
   <div id="toast" class="toast-hidden"></div>
 
   <div id="edit-toolbar" class="hidden">
-    <span class="toolbar-label">Edit</span>
-    <button id="btn-color-red" class="swatch swatch-red" title="Red (R)"></button>
-    <button id="btn-color-blue" class="swatch swatch-blue" title="Blue (B)"></button>
-    <button id="btn-color-yellow" class="swatch swatch-yellow" title="Yellow (Y)"></button>
-    <button id="btn-color-white" class="swatch swatch-white" title="White (W)"></button>
-    <button id="btn-color-black" class="swatch swatch-black" title="Black (K)"></button>
-    <span class="toolbar-sep"></span>
-    <button id="btn-split-h" class="toolbar-btn" title="Split Horizontal (H)">⬌</button>
-    <button id="btn-split-v" class="toolbar-btn" title="Split Vertical (V)">⬍</button>
-    <button id="btn-merge" class="toolbar-btn" title="Merge (Shift+click then M)">⊕</button>
-    <button id="btn-delete" class="toolbar-btn toolbar-delete" title="Delete (Del)">✕</button>
+    <span class="toolbar-label toolbar-region">Edit</span>
+    <button id="btn-color-red" class="swatch swatch-red toolbar-region" title="Red (R)"></button>
+    <button id="btn-color-blue" class="swatch swatch-blue toolbar-region" title="Blue (B)"></button>
+    <button id="btn-color-yellow" class="swatch swatch-yellow toolbar-region" title="Yellow (Y)"></button>
+    <button id="btn-color-white" class="swatch swatch-white toolbar-region" title="White (W)"></button>
+    <button id="btn-color-black" class="swatch swatch-black toolbar-region" title="Black (K)"></button>
+    <span class="toolbar-sep toolbar-region"></span>
+    <button id="btn-split-h" class="toolbar-btn toolbar-region" title="Split Horizontal (H)">⬌</button>
+    <button id="btn-split-v" class="toolbar-btn toolbar-region" title="Split Vertical (V)">⬍</button>
+    <button id="btn-merge" class="toolbar-btn toolbar-region" title="Merge (Shift+click then M)">⊕</button>
+    <button id="btn-delete" class="toolbar-btn toolbar-delete toolbar-region" title="Delete (Del)">✕</button>
+    <span class="toolbar-sep toolbar-line-only"></span>
+    <span class="toolbar-label toolbar-line-only">Line</span>
+    <button id="btn-toggle-thickness" class="toolbar-btn toolbar-line-only" title="Toggle Line Thickness (T)">⬡</button>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

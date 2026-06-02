@@ -36,6 +36,10 @@ export interface MondrianParams {
   blackFrame: boolean;
   /** Whether lines stop short of canvas edges (leaving small gaps). Default true. */
   lineEdgeGap: boolean;
+  /** Thickness of a regular line in cells. Default 1. */
+  regularLineThickness: number;
+  /** Thickness of a thick line in cells. Default 2. */
+  thickLineThickness: number;
 }
 // ---------------------------------------------------------------------------
 // Helpers
@@ -340,7 +344,7 @@ export function stepMondrian(state: MondrianState): boolean {
       const canThick = state.rng() < state.params.lineThickChance
         && lineR + 1 < rect.r + rect.h - state.minRSize
         && thickOk;
-      const thick = canThick ? 2 : 1;
+      const thick = canThick ? state.params.thickLineThickness : state.params.regularLineThickness;
 
       const edgeGap = state.params.lineEdgeGap ? state.gap : 0;
       const hStartC = rect.c === 0 ? edgeGap : rect.c;
@@ -375,7 +379,7 @@ export function stepMondrian(state: MondrianState): boolean {
       const canThick = state.rng() < state.params.lineThickChance
         && lineC + 1 < rect.c + rect.w - state.minRSize
         && thickOk;
-      const thick = canThick ? 2 : 1;
+      const thick = canThick ? state.params.thickLineThickness : state.params.regularLineThickness;
 
       const edgeGap = state.params.lineEdgeGap ? state.gap : 0;
       const vStartR = rect.r === 0 ? edgeGap : rect.r;
@@ -956,58 +960,88 @@ export function toggleLineEdgeTouch(
   const size = grid.rows;
 
   if (seg.horizontal && (edge === 'left' || edge === 'right')) {
+    // Find all rows of this (possibly thick) horizontal line
+    const midC = Math.floor((seg.c0 + seg.c1) / 2);
+    let topR = seg.r0;
+    while (topR - 1 >= 0 && grid.get(topR - 1, midC) === 'line') topR--;
+    let botR = seg.r0;
+    while (botR + 1 < size && grid.get(botR + 1, midC) === 'line') botR++;
+
     if (edge === 'left' && seg.c0 <= edgeGap) {
       if (seg.c0 === 0) {
-        // Currently touches — trim it
+        // Currently touches — trim all rows
         const adjColor = grid.get(seg.r0, edgeGap) === 'line' ? 'white' : (grid.get(seg.r0, edgeGap) as LifeColor);
-        for (let c = 0; c < edgeGap && c <= seg.c1; c++) {
-          if (grid.get(seg.r0, c) === 'line') grid.set(seg.r0, c, adjColor === 'line' ? 'white' : adjColor);
+        for (let r = topR; r <= botR; r++) {
+          for (let c = 0; c < edgeGap && c <= seg.c1; c++) {
+            if (grid.get(r, c) === 'line') grid.set(r, c, adjColor === 'line' ? 'white' : adjColor);
+          }
         }
         return true;
       } else {
-        // Currently doesn't touch — extend it
-        for (let c = 0; c < seg.c0; c++) grid.set(seg.r0, c, 'line');
+        // Currently doesn't touch — extend all rows
+        for (let r = topR; r <= botR; r++) {
+          for (let c = 0; c < seg.c0; c++) grid.set(r, c, 'line');
+        }
         return true;
       }
     }
     if (edge === 'right' && seg.c1 >= size - 1 - edgeGap) {
       if (seg.c1 === size - 1) {
-        // Currently touches — trim it
+        // Currently touches — trim all rows
         const adjColor = grid.get(seg.r0, size - 1 - edgeGap) === 'line' ? 'white' : (grid.get(seg.r0, size - 1 - edgeGap) as LifeColor);
-        for (let c = size - edgeGap; c < size; c++) {
-          if (grid.get(seg.r0, c) === 'line') grid.set(seg.r0, c, adjColor === 'line' ? 'white' : adjColor);
+        for (let r = topR; r <= botR; r++) {
+          for (let c = size - edgeGap; c < size; c++) {
+            if (grid.get(r, c) === 'line') grid.set(r, c, adjColor === 'line' ? 'white' : adjColor);
+          }
         }
         return true;
       } else {
-        // Currently doesn't touch — extend it
-        for (let c = seg.c1 + 1; c < size; c++) grid.set(seg.r0, c, 'line');
+        // Currently doesn't touch — extend all rows
+        for (let r = topR; r <= botR; r++) {
+          for (let c = seg.c1 + 1; c < size; c++) grid.set(r, c, 'line');
+        }
         return true;
       }
     }
   }
 
   if (!seg.horizontal && (edge === 'top' || edge === 'bottom')) {
+    // Find all columns of this (possibly thick) vertical line
+    const midR = Math.floor((seg.r0 + seg.r1) / 2);
+    let leftC = seg.c0;
+    while (leftC - 1 >= 0 && grid.get(midR, leftC - 1) === 'line') leftC--;
+    let rightC = seg.c0;
+    while (rightC + 1 < size && grid.get(midR, rightC + 1) === 'line') rightC++;
+
     if (edge === 'top' && seg.r0 <= edgeGap) {
       if (seg.r0 === 0) {
         const adjColor = grid.get(edgeGap, seg.c0) === 'line' ? 'white' : (grid.get(edgeGap, seg.c0) as LifeColor);
-        for (let r = 0; r < edgeGap && r <= seg.r1; r++) {
-          if (grid.get(r, seg.c0) === 'line') grid.set(r, seg.c0, adjColor === 'line' ? 'white' : adjColor);
+        for (let c = leftC; c <= rightC; c++) {
+          for (let r = 0; r < edgeGap && r <= seg.r1; r++) {
+            if (grid.get(r, c) === 'line') grid.set(r, c, adjColor === 'line' ? 'white' : adjColor);
+          }
         }
         return true;
       } else {
-        for (let r = 0; r < seg.r0; r++) grid.set(r, seg.c0, 'line');
+        for (let c = leftC; c <= rightC; c++) {
+          for (let r = 0; r < seg.r0; r++) grid.set(r, c, 'line');
+        }
         return true;
       }
     }
     if (edge === 'bottom' && seg.r1 >= size - 1 - edgeGap) {
       if (seg.r1 === size - 1) {
         const adjColor = grid.get(size - 1 - edgeGap, seg.c0) === 'line' ? 'white' : (grid.get(size - 1 - edgeGap, seg.c0) as LifeColor);
-        for (let r = size - edgeGap; r < size; r++) {
-          if (grid.get(r, seg.c0) === 'line') grid.set(r, seg.c0, adjColor === 'line' ? 'white' : adjColor);
+        for (let c = leftC; c <= rightC; c++) {
+          for (let r = size - edgeGap; r < size; r++) {
+            if (grid.get(r, c) === 'line') grid.set(r, c, adjColor === 'line' ? 'white' : adjColor);
+          }
         }
         return true;
       } else {
-        for (let r = seg.r1 + 1; r < size; r++) grid.set(r, seg.c0, 'line');
+        for (let c = leftC; c <= rightC; c++) {
+          for (let r = seg.r1 + 1; r < size; r++) grid.set(r, c, 'line');
+        }
         return true;
       }
     }
@@ -1027,6 +1061,168 @@ export function findLineSegmentsAt(segments: LineSegment[], r: number, c: number
     }
   }
   return found;
+}
+
+// ---------------------------------------------------------------------------
+// Line thickness helpers
+// ---------------------------------------------------------------------------
+
+export interface LineBounds {
+  horizontal: boolean;
+  r0: number; c0: number;
+  r1: number; c1: number;
+  thickness: number;
+}
+
+/** Get the full bounding box (including thickness) of the line at cell (r,c). */
+export function getLineBounds(grid: Grid<LifeColor>, r: number, c: number): LineBounds | null {
+  if (grid.get(r, c) !== 'line') return null;
+  const size = grid.rows;
+
+  // Trace horizontally
+  let c0 = c, c1 = c;
+  while (c0 - 1 >= 0 && grid.get(r, c0 - 1) === 'line') c0--;
+  while (c1 + 1 < size && grid.get(r, c1 + 1) === 'line') c1++;
+
+  // Trace vertically
+  let r0 = r, r1 = r;
+  while (r0 - 1 >= 0 && grid.get(r0 - 1, c) === 'line') r0--;
+  while (r1 + 1 < size && grid.get(r1 + 1, c) === 'line') r1++;
+
+  const hLen = c1 - c0 + 1;
+  const vLen = r1 - r0 + 1;
+
+  if (hLen >= vLen) {
+    // Horizontal line — find true thickness by scanning all columns.
+    // Take the minimum to avoid perpendicular line intersections inflating the count.
+    let minThick = Infinity;
+    let bestR0 = r, bestR1 = r;
+    for (let col = c0; col <= c1; col++) {
+      let tr0 = r, tr1 = r;
+      while (tr0 - 1 >= 0 && grid.get(tr0 - 1, col) === 'line') tr0--;
+      while (tr1 + 1 < size && grid.get(tr1 + 1, col) === 'line') tr1++;
+      const t = tr1 - tr0 + 1;
+      if (t < minThick) { minThick = t; bestR0 = tr0; bestR1 = tr1; }
+      if (minThick === 1) break;
+    }
+    return { horizontal: true, r0: bestR0, c0, r1: bestR1, c1, thickness: minThick };
+  } else {
+    // Vertical line — find true thickness by scanning all rows.
+    let minThick = Infinity;
+    let bestC0 = c, bestC1 = c;
+    for (let row = r0; row <= r1; row++) {
+      let tc0 = c, tc1 = c;
+      while (tc0 - 1 >= 0 && grid.get(row, tc0 - 1) === 'line') tc0--;
+      while (tc1 + 1 < size && grid.get(row, tc1 + 1) === 'line') tc1++;
+      const t = tc1 - tc0 + 1;
+      if (t < minThick) { minThick = t; bestC0 = tc0; bestC1 = tc1; }
+      if (minThick === 1) break;
+    }
+    return { horizontal: false, r0, c0: bestC0, r1, c1: bestC1, thickness: minThick };
+  }
+}
+
+/**
+ * Change the thickness of a line at cell (r,c).
+ * When thickening, adds rows/cols of line cells at the bottom/right.
+ * When thinning, removes rows/cols from the bottom/right and fills with adjacent color.
+ */
+export function setLineThickness(grid: Grid<LifeColor>, r: number, c: number, newThickness: number): boolean {
+  const bounds = getLineBounds(grid, r, c);
+  if (!bounds) return false;
+  if (newThickness < 1) return false;
+  if (newThickness === bounds.thickness) return false;
+
+  const size = grid.rows;
+
+  if (bounds.horizontal) {
+    if (newThickness > bounds.thickness) {
+      // Thicken — add rows at the bottom
+      const toAdd = newThickness - bounds.thickness;
+      for (let dr = 0; dr < toAdd; dr++) {
+        const row = bounds.r1 + 1 + dr;
+        if (row >= size) break;
+        for (let col = bounds.c0; col <= bounds.c1; col++) {
+          if (grid.get(row, col) !== 'line') {
+            grid.set(row, col, 'line');
+          }
+        }
+      }
+    } else {
+      // Thin — remove rows from the bottom
+      const toRemove = bounds.thickness - newThickness;
+      for (let dr = 0; dr < toRemove; dr++) {
+        const row = bounds.r1 - dr;
+        if (row < 0) break;
+        for (let col = bounds.c0; col <= bounds.c1; col++) {
+          if (grid.get(row, col) !== 'line') continue;
+          // Skip cells at perpendicular line intersections: if there are
+          // line cells both above and below, this cell is part of a vertical
+          // line crossing through — removing it would split that line.
+          if (row > 0 && row < size - 1 &&
+              grid.get(row - 1, col) === 'line' &&
+              grid.get(row + 1, col) === 'line') continue;
+          // Find fill color: check below first, then above
+          let fillColor: LifeColor = 'white';
+          for (let sr = row + 1; sr < size; sr++) {
+            const v = grid.get(sr, col);
+            if (v !== 'line') { fillColor = v as LifeColor; break; }
+          }
+          if (fillColor === 'line' || fillColor === 'empty') {
+            for (let sr = row - 1; sr >= 0; sr--) {
+              const v = grid.get(sr, col);
+              if (v !== 'line') { fillColor = v as LifeColor; break; }
+            }
+          }
+          if (fillColor === 'line' || fillColor === 'empty') fillColor = 'white';
+          grid.set(row, col, fillColor);
+        }
+      }
+    }
+  } else {
+    if (newThickness > bounds.thickness) {
+      // Thicken — add columns at the right
+      const toAdd = newThickness - bounds.thickness;
+      for (let dc = 0; dc < toAdd; dc++) {
+        const col = bounds.c1 + 1 + dc;
+        if (col >= size) break;
+        for (let row = bounds.r0; row <= bounds.r1; row++) {
+          if (grid.get(row, col) !== 'line') {
+            grid.set(row, col, 'line');
+          }
+        }
+      }
+    } else {
+      // Thin — remove columns from the right
+      const toRemove = bounds.thickness - newThickness;
+      for (let dc = 0; dc < toRemove; dc++) {
+        const col = bounds.c1 - dc;
+        if (col < 0) break;
+        for (let row = bounds.r0; row <= bounds.r1; row++) {
+          if (grid.get(row, col) !== 'line') continue;
+          // Skip cells at perpendicular line intersections
+          if (col > 0 && col < size - 1 &&
+              grid.get(row, col - 1) === 'line' &&
+              grid.get(row, col + 1) === 'line') continue;
+          let fillColor: LifeColor = 'white';
+          for (let sc = col + 1; sc < size; sc++) {
+            const v = grid.get(row, sc);
+            if (v !== 'line') { fillColor = v as LifeColor; break; }
+          }
+          if (fillColor === 'line' || fillColor === 'empty') {
+            for (let sc = col - 1; sc >= 0; sc--) {
+              const v = grid.get(row, sc);
+              if (v !== 'line') { fillColor = v as LifeColor; break; }
+            }
+          }
+          if (fillColor === 'line' || fillColor === 'empty') fillColor = 'white';
+          grid.set(row, col, fillColor);
+        }
+      }
+    }
+  }
+
+  return true;
 }
 
 // ---------------------------------------------------------------------------

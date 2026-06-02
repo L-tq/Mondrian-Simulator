@@ -1,9 +1,9 @@
 import { Application, Graphics } from 'pixi.js';
 import type { Grid } from './automata';
 import type { LifeColor, MondrianParams, MondrianState } from './mondrian';
-import { generateMondrianGrid, initMondrianState, stepMondrian, dumpGrid, extractRegions, findRegionAt, applyRegionColor, splitRegion, mergeRegions, mergeFailureReason, extractLineSegments, findLineSegmentsAt, toggleLineEdgeTouch } from './mondrian';
-import type { ColoredRect } from './mondrian';
-import { drawGrid, drawHighlight, COLORS } from './renderer';
+import { generateMondrianGrid, initMondrianState, stepMondrian, dumpGrid, extractRegions, findRegionAt, applyRegionColor, splitRegion, mergeRegions, mergeFailureReason, extractLineSegments, findLineSegmentsAt, toggleLineEdgeTouch, getLineBounds, setLineThickness } from './mondrian';
+import type { ColoredRect, LineBounds } from './mondrian';
+import { drawGrid, drawHighlight, drawLineHighlight, COLORS } from './renderer';
 
 const DEBUG = typeof window !== 'undefined' && /[?&]debug=1/.test(window.location.search);
 if (DEBUG) console.log('[main] debug mode enabled');
@@ -31,6 +31,11 @@ const tjJunctionRateLabel = document.getElementById('tj-junction-rate-label') as
 const proportionalBiasLabel = document.getElementById('proportional-bias-label') as HTMLSpanElement;
 const toggleBlackFrame = document.getElementById('black-frame') as HTMLInputElement;
 const toggleLineEdgeGap = document.getElementById('line-edge-gap') as HTMLInputElement;
+const sliderLineWidth = document.getElementById('line-width') as HTMLInputElement;
+const sliderThickWidth = document.getElementById('thick-width') as HTMLInputElement;
+const lineWidthLabel = document.getElementById('line-width-label') as HTMLSpanElement;
+const thickWidthLabel = document.getElementById('thick-width-label') as HTMLSpanElement;
+const btnToggleThickness = document.getElementById('btn-toggle-thickness') as HTMLButtonElement;
 
 // ---------------------------------------------------------------------------
 // Cookie helpers
@@ -50,6 +55,8 @@ interface Settings {
   proportionalBias: number;
   blackFrame: boolean;
   lineEdgeGap: boolean;
+  lineWidth: number;
+  thickWidth: number;
 }
 
 function saveSettings(): void {
@@ -64,6 +71,8 @@ function saveSettings(): void {
     proportionalBias: parseFloat(sliderProportionalBias.value),
     blackFrame: toggleBlackFrame.checked,
     lineEdgeGap: toggleLineEdgeGap.checked,
+    lineWidth: parseInt(sliderLineWidth.value, 10),
+    thickWidth: parseInt(sliderThickWidth.value, 10),
   };
   const expires = new Date(Date.now() + COOKIE_DAYS * 864e5).toUTCString();
   document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(s))}; expires=${expires}; path=/; SameSite=Lax`;
@@ -98,6 +107,10 @@ function applySettings(s: Settings): void {
   proportionalBiasLabel.textContent = String(s.proportionalBias ?? 0.65);
   toggleBlackFrame.checked = s.blackFrame ?? false;
   toggleLineEdgeGap.checked = s.lineEdgeGap ?? true;
+  sliderLineWidth.value = String(s.lineWidth ?? 1);
+  lineWidthLabel.textContent = String(s.lineWidth ?? 1);
+  sliderThickWidth.value = String(s.thickWidth ?? 2);
+  thickWidthLabel.textContent = String(s.thickWidth ?? 2);
 }
 
 const saved = loadSettings();
@@ -122,6 +135,10 @@ if (saved) {
   proportionalBiasLabel.textContent = '0.65';
   toggleBlackFrame.checked = false;
   toggleLineEdgeGap.checked = true;
+  sliderLineWidth.value = '1';
+  sliderThickWidth.value = '2';
+  lineWidthLabel.textContent = '1';
+  thickWidthLabel.textContent = '2';
 }
 
 let canvasSize = 0;
@@ -134,6 +151,7 @@ let animTimer: number | null = null;
 let regions: ColoredRect[] = [];
 let selectedIdx: number = -1;
 let secondSelectedIdx: number = -1;
+let selectedLineBounds: LineBounds | null = null;
 let highlightGraphics: Graphics | null = null;
 
 const app = new Application();
@@ -188,6 +206,8 @@ async function init(): Promise<void> {
       proportionalBias: parseFloat(sliderProportionalBias.value),
       blackFrame: toggleBlackFrame.checked,
       lineEdgeGap: toggleLineEdgeGap.checked,
+      regularLineThickness: parseInt(sliderLineWidth.value, 10) || 1,
+      thickLineThickness: parseInt(sliderThickWidth.value, 10) || 2,
     };
   }
 
@@ -209,16 +229,41 @@ async function init(): Promise<void> {
     if (secondSelectedIdx >= 0 && secondSelectedIdx < regions.length) {
       drawHighlight(highlightGraphics!, regions[secondSelectedIdx], currentGrid.rows, canvasSize, canvasSize);
     }
+    if (selectedLineBounds !== null) {
+      drawLineHighlight(highlightGraphics!, selectedLineBounds, currentGrid.rows, canvasSize, canvasSize);
+    }
     updateEditToolbar();
   }
 
   function updateEditToolbar(): void {
     const bar = document.getElementById('edit-toolbar');
     if (!bar) return;
-    if (selectedIdx >= 0) {
+    const hasRegion = selectedIdx >= 0;
+    const hasLine = selectedLineBounds !== null;
+    if (hasRegion || hasLine) {
       bar.classList.remove('hidden');
     } else {
       bar.classList.add('hidden');
+    }
+    // Show/hide region-only elements
+    bar.querySelectorAll('.toolbar-region').forEach(el => {
+      (el as HTMLElement).style.display = hasRegion ? '' : 'none';
+    });
+    // Show/hide line-only elements
+    bar.querySelectorAll('.toolbar-line-only').forEach(el => {
+      (el as HTMLElement).style.display = hasLine ? '' : 'none';
+    });
+    // Update thickness button label based on current line thickness
+    if (hasLine && selectedLineBounds) {
+      const regWidth = parseInt(sliderLineWidth.value, 10) || 1;
+      const thickWidth = parseInt(sliderThickWidth.value, 10) || 2;
+      if (selectedLineBounds.thickness === thickWidth) {
+        btnToggleThickness.title = 'Switch to regular thickness (T)';
+        btnToggleThickness.textContent = '⇣';
+      } else {
+        btnToggleThickness.title = 'Switch to thick thickness (T)';
+        btnToggleThickness.textContent = '⇡';
+      }
     }
   }
 
@@ -248,6 +293,7 @@ async function init(): Promise<void> {
     if (color === 'empty') {
       selectedIdx = -1;
       secondSelectedIdx = -1;
+      selectedLineBounds = null;
       redrawAll();
       return;
     }
@@ -292,6 +338,9 @@ async function init(): Promise<void> {
         const changed = toggleLineEdgeTouch(currentGrid, targetSeg, edge, gap);
         if (changed) {
           refreshRegions();
+          selectedIdx = -1;
+          secondSelectedIdx = -1;
+          selectedLineBounds = getLineBounds(currentGrid, cell.r, cell.c);
           redrawAll();
           const dir = edge === 'left' ? 'left' : edge === 'right' ? 'right' : edge === 'top' ? 'top' : 'bottom';
           showToast(`Line ${dir} edge toggled`);
@@ -299,13 +348,16 @@ async function init(): Promise<void> {
         }
       }
 
-      // Clicked on a non-edge line cell — deselect
+      // Select the line (not near an edge, or edge toggle didn't apply)
       selectedIdx = -1;
       secondSelectedIdx = -1;
+      selectedLineBounds = getLineBounds(currentGrid, cell.r, cell.c);
       redrawAll();
       return;
     }
 
+    // Colored region — deselect line, select region
+    selectedLineBounds = null;
     const idx = findRegionAt(regions, cell.r, cell.c);
     if (idx < 0) return;
 
@@ -378,6 +430,22 @@ async function init(): Promise<void> {
     redrawAll();
   }
 
+  function toggleSelectedLineThickness(): void {
+    if (currentGrid === null || selectedLineBounds === null) return;
+    const regWidth = parseInt(sliderLineWidth.value, 10) || 1;
+    const thickWidth = parseInt(sliderThickWidth.value, 10) || 2;
+    const newThickness = selectedLineBounds.thickness === thickWidth ? regWidth : thickWidth;
+    const midR = Math.floor((selectedLineBounds.r0 + selectedLineBounds.r1) / 2);
+    const midC = Math.floor((selectedLineBounds.c0 + selectedLineBounds.c1) / 2);
+    const changed = setLineThickness(currentGrid, midR, midC, newThickness);
+    if (changed) {
+      refreshRegions();
+      selectedLineBounds = getLineBounds(currentGrid, midR, midC);
+      redrawAll();
+      showToast(newThickness === thickWidth ? 'Line → thick' : 'Line → regular');
+    }
+  }
+
   function updateStepIndicator(): void {
     if (mondrianState !== null && mondrianState.phase === 'splitting') {
       stepIndicator.textContent = `Building • ${mondrianState.rects.length} rects`;
@@ -412,6 +480,7 @@ async function init(): Promise<void> {
     mondrianState = null;
     selectedIdx = -1;
     secondSelectedIdx = -1;
+    selectedLineBounds = null;
     refreshRegions();
     if (DEBUG) { console.log(`[main] one-shot #${genCount}:`); dumpGrid(currentGrid); }
     redrawAll();
@@ -428,6 +497,7 @@ async function init(): Promise<void> {
     currentGrid = mondrianState.grid;
     selectedIdx = -1;
     secondSelectedIdx = -1;
+    selectedLineBounds = null;
     if (DEBUG) console.log(`[main] build replay #${genCount} (seed ${currentSeed}) started`);
     redrawAll();
     updateStepIndicator();
@@ -532,6 +602,15 @@ async function init(): Promise<void> {
   toggleBlackFrame.addEventListener('change', saveSettings);
   toggleLineEdgeGap.addEventListener('change', saveSettings);
 
+  sliderLineWidth.addEventListener('input', () => {
+    lineWidthLabel.textContent = sliderLineWidth.value;
+  });
+  sliderThickWidth.addEventListener('input', () => {
+    thickWidthLabel.textContent = sliderThickWidth.value;
+  });
+
+  btnToggleThickness.addEventListener('click', toggleSelectedLineThickness);
+
   btnSettings.addEventListener('click', (e) => {
     e.stopPropagation();
     dropdown.classList.toggle('hidden');
@@ -565,7 +644,8 @@ async function init(): Promise<void> {
       else if (e.key === 'v') splitSelectedRegion(false);
       else if (e.key === 'm' && secondSelectedIdx >= 0) mergeSelectedRegions();
       else if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelectedRegion(); }
-      else if (e.key === 'Escape') { selectedIdx = -1; secondSelectedIdx = -1; redrawAll(); }
+      else if (e.key === 'Escape') { selectedIdx = -1; secondSelectedIdx = -1; selectedLineBounds = null; redrawAll(); }
+      else if (e.key === 't' && selectedLineBounds !== null) toggleSelectedLineThickness();
     }
   });
 

@@ -1,5 +1,5 @@
 import { Graphics } from 'pixi.js';
-import type { LifeColor, ColoredRect } from './mondrian';
+import type { LifeColor, ColoredRect, LineBounds } from './mondrian';
 import type { Grid } from './automata';
 
 export const COLORS: Record<string, string> = {
@@ -86,5 +86,25 @@ export function drawHighlight(
 
   graphics.rect(x, y, w, h).stroke({ color: '#FFD700', width: 2.5 });
   // Inner outline for visibility
+  graphics.rect(x + 1, y + 1, w - 2, h - 2).stroke({ color: '#000000', width: 1, alpha: 0.5 });
+}
+
+export function drawLineHighlight(
+  graphics: Graphics,
+  bounds: LineBounds,
+  gridSize: number,
+  width: number,
+  height: number,
+): void {
+  const margin = Math.round(Math.min(width, height) * 0.04);
+  const cellW = (width - 2 * margin) / gridSize;
+  const cellH = (height - 2 * margin) / gridSize;
+
+  const x = margin + bounds.c0 * cellW;
+  const y = margin + bounds.r0 * cellH;
+  const w = (bounds.c1 - bounds.c0 + 1) * cellW;
+  const h = (bounds.r1 - bounds.r0 + 1) * cellH;
+
+  graphics.rect(x, y, w, h).stroke({ color: '#FFD700', width: 2.5 });
   graphics.rect(x + 1, y + 1, w - 2, h - 2).stroke({ color: '#000000', width: 1, alpha: 0.5 });
 }
