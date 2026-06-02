@@ -1,7 +1,7 @@
 import { Application, Graphics } from 'pixi.js';
 import type { Grid } from './automata';
 import type { LifeColor, MondrianParams, MondrianState } from './mondrian';
-import { generateMondrianGrid, initMondrianState, stepMondrian, dumpGrid, extractRegions, findRegionAt, applyRegionColor, splitRegion, mergeRegions, mergeFailureReason } from './mondrian';
+import { generateMondrianGrid, initMondrianState, stepMondrian, dumpGrid, extractRegions, findRegionAt, applyRegionColor, splitRegion, mergeRegions, mergeFailureReason, extractLineSegments, findLineSegmentsAt, toggleLineEdgeTouch } from './mondrian';
 import type { ColoredRect } from './mondrian';
 import { drawGrid, drawHighlight, COLORS } from './renderer';
 
@@ -29,6 +29,8 @@ const lineGapLabel = document.getElementById('line-gap-label') as HTMLSpanElemen
 const lineThickChanceLabel = document.getElementById('line-thick-chance-label') as HTMLSpanElement;
 const tjJunctionRateLabel = document.getElementById('tj-junction-rate-label') as HTMLSpanElement;
 const proportionalBiasLabel = document.getElementById('proportional-bias-label') as HTMLSpanElement;
+const toggleBlackFrame = document.getElementById('black-frame') as HTMLInputElement;
+const toggleLineEdgeGap = document.getElementById('line-edge-gap') as HTMLInputElement;
 
 // ---------------------------------------------------------------------------
 // Cookie helpers
@@ -46,6 +48,8 @@ interface Settings {
   lineThickChance: number;
   tJunctionRate: number;
   proportionalBias: number;
+  blackFrame: boolean;
+  lineEdgeGap: boolean;
 }
 
 function saveSettings(): void {
@@ -58,6 +62,8 @@ function saveSettings(): void {
     lineThickChance: parseFloat(sliderLineThickChance.value),
     tJunctionRate: parseFloat(sliderTJunctionRate.value),
     proportionalBias: parseFloat(sliderProportionalBias.value),
+    blackFrame: toggleBlackFrame.checked,
+    lineEdgeGap: toggleLineEdgeGap.checked,
   };
   const expires = new Date(Date.now() + COOKIE_DAYS * 864e5).toUTCString();
   document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(s))}; expires=${expires}; path=/; SameSite=Lax`;
@@ -90,6 +96,8 @@ function applySettings(s: Settings): void {
   tjJunctionRateLabel.textContent = String(s.tJunctionRate ?? 0.45);
   sliderProportionalBias.value = String(s.proportionalBias ?? 0.65);
   proportionalBiasLabel.textContent = String(s.proportionalBias ?? 0.65);
+  toggleBlackFrame.checked = s.blackFrame ?? false;
+  toggleLineEdgeGap.checked = s.lineEdgeGap ?? true;
 }
 
 const saved = loadSettings();
@@ -112,6 +120,8 @@ if (saved) {
   lineThickChanceLabel.textContent = '0';
   tjJunctionRateLabel.textContent = '0.45';
   proportionalBiasLabel.textContent = '0.65';
+  toggleBlackFrame.checked = false;
+  toggleLineEdgeGap.checked = true;
 }
 
 let canvasSize = 0;
@@ -176,8 +186,12 @@ async function init(): Promise<void> {
       lineThickChance: parseFloat(sliderLineThickChance.value),
       tJunctionRate: parseFloat(sliderTJunctionRate.value),
       proportionalBias: parseFloat(sliderProportionalBias.value),
+      blackFrame: toggleBlackFrame.checked,
+      lineEdgeGap: toggleLineEdgeGap.checked,
     };
   }
+
+  let currentBlackFrame = false;
 
   function refreshRegions(): void {
     if (currentGrid !== null) {
@@ -187,7 +201,7 @@ async function init(): Promise<void> {
 
   function redrawAll(): void {
     if (currentGrid === null) return;
-    drawGrid(graphics, currentGrid, canvasSize, canvasSize);
+    drawGrid(graphics, currentGrid, canvasSize, canvasSize, currentBlackFrame);
     highlightGraphics?.clear();
     if (selectedIdx >= 0 && selectedIdx < regions.length) {
       drawHighlight(highlightGraphics!, regions[selectedIdx], currentGrid.rows, canvasSize, canvasSize);
@@ -231,8 +245,61 @@ async function init(): Promise<void> {
     if (!cell || currentGrid === null) return;
 
     const color = currentGrid.get(cell.r, cell.c);
-    if (color === 'empty' || color === 'line') {
-      // Clicked on a line or empty area — deselect
+    if (color === 'empty') {
+      selectedIdx = -1;
+      secondSelectedIdx = -1;
+      redrawAll();
+      return;
+    }
+
+    if (color === 'line') {
+      // Toggle line edge touch if any segment at this cell has an end near a canvas edge
+      const size = currentGrid.rows;
+      const gap = parseInt(sliderLineGap.value, 10);
+      const segs = extractLineSegments(currentGrid);
+      const matches = findLineSegmentsAt(segs, cell.r, cell.c);
+
+      let edge: 'left' | 'right' | 'top' | 'bottom' | null = null;
+      let targetSeg: typeof matches[0] | null = null;
+
+      for (const seg of matches) {
+        if (seg.horizontal) {
+          const nearLeft = seg.c0 <= gap;
+          const nearRight = seg.c1 >= size - 1 - gap;
+          if (nearLeft && nearRight) {
+            edge = (cell.c - seg.c0 < seg.c1 - cell.c) ? 'left' : 'right';
+            targetSeg = seg; break;
+          } else if (nearLeft) {
+            edge = 'left'; targetSeg = seg; break;
+          } else if (nearRight) {
+            edge = 'right'; targetSeg = seg; break;
+          }
+        } else {
+          const nearTop = seg.r0 <= gap;
+          const nearBottom = seg.r1 >= size - 1 - gap;
+          if (nearTop && nearBottom) {
+            edge = (cell.r - seg.r0 < seg.r1 - cell.r) ? 'top' : 'bottom';
+            targetSeg = seg; break;
+          } else if (nearTop) {
+            edge = 'top'; targetSeg = seg; break;
+          } else if (nearBottom) {
+            edge = 'bottom'; targetSeg = seg; break;
+          }
+        }
+      }
+
+      if (targetSeg && edge) {
+        const changed = toggleLineEdgeTouch(currentGrid, targetSeg, edge, gap);
+        if (changed) {
+          refreshRegions();
+          redrawAll();
+          const dir = edge === 'left' ? 'left' : edge === 'right' ? 'right' : edge === 'top' ? 'top' : 'bottom';
+          showToast(`Line ${dir} edge toggled`);
+          return;
+        }
+      }
+
+      // Clicked on a non-edge line cell — deselect
       selectedIdx = -1;
       secondSelectedIdx = -1;
       redrawAll();
@@ -340,6 +407,7 @@ async function init(): Promise<void> {
 
     currentSeed = (Math.random() * 2147483647) | 0;
     const params = readParams();
+    currentBlackFrame = params.blackFrame;
     currentGrid = generateMondrianGrid(gridSize, params, currentSeed);
     mondrianState = null;
     selectedIdx = -1;
@@ -460,6 +528,9 @@ async function init(): Promise<void> {
   sliderProportionalBias.addEventListener('input', () => {
     proportionalBiasLabel.textContent = parseFloat(sliderProportionalBias.value).toFixed(2);
   });
+
+  toggleBlackFrame.addEventListener('change', saveSettings);
+  toggleLineEdgeGap.addEventListener('change', saveSettings);
 
   btnSettings.addEventListener('click', (e) => {
     e.stopPropagation();

@@ -16,7 +16,8 @@ export function drawGrid(
   graphics: Graphics,
   grid: Grid<LifeColor>,
   width: number,
-  height: number
+  height: number,
+  blackFrame: boolean = false,
 ): void {
   graphics.clear();
 
@@ -25,27 +26,31 @@ export function drawGrid(
   const cellW = (width - 2 * margin) / size;
   const cellH = (height - 2 * margin) / size;
 
-  // Visual black frame around the grid
-  const frameThick = Math.max(2, Math.round(Math.min(cellW, cellH) * 1.2));
-  const fx0 = margin - frameThick;
-  const fy0 = margin - frameThick;
-  const gridW = width - 2 * margin;
-  const gridH = height - 2 * margin;
+  // Visual black frame around the grid (optional)
+  if (blackFrame) {
+    const frameThick = Math.max(2, Math.round(Math.min(cellW, cellH) * 1.2));
+    const fx0 = margin - frameThick;
+    const fy0 = margin - frameThick;
+    const gridW = width - 2 * margin;
+    const gridH = height - 2 * margin;
 
-  graphics
-    .rect(fx0, fy0, gridW + 2 * frameThick, frameThick)
-    .fill({ color: COLORS.black });
-  graphics
-    .rect(fx0, fy0 + gridH + frameThick, gridW + 2 * frameThick, frameThick)
-    .fill({ color: COLORS.black });
-  graphics
-    .rect(fx0, fy0, frameThick, gridH + 2 * frameThick)
-    .fill({ color: COLORS.black });
-  graphics
-    .rect(fx0 + gridW + frameThick, fy0, frameThick, gridH + 2 * frameThick)
-    .fill({ color: COLORS.black });
+    graphics
+      .rect(fx0, fy0, gridW + 2 * frameThick, frameThick)
+      .fill({ color: COLORS.black });
+    graphics
+      .rect(fx0, fy0 + gridH + frameThick, gridW + 2 * frameThick, frameThick)
+      .fill({ color: COLORS.black });
+    graphics
+      .rect(fx0, fy0, frameThick, gridH + 2 * frameThick)
+      .fill({ color: COLORS.black });
+    graphics
+      .rect(fx0 + gridW + frameThick, fy0, frameThick, gridH + 2 * frameThick)
+      .fill({ color: COLORS.black });
+  }
 
   // White background inside the frame
+  const gridW = width - 2 * margin;
+  const gridH = height - 2 * margin;
   graphics.rect(margin, margin, gridW, gridH).fill({ color: COLORS.white });
 
   for (let r = 0; r < size; r++) {

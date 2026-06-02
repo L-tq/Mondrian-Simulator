@@ -37,8 +37,8 @@
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
   </script>
-  <script type="module" crossorigin src="/Mondrian-Simulator/assets/index-Diof40zX.js"></script>
-  <link rel="stylesheet" crossorigin href="/Mondrian-Simulator/assets/index-BS-LXGX6.css">
+  <script type="module" crossorigin src="/Mondrian-Simulator/assets/index-BmX26GeE.js"></script>
+  <link rel="stylesheet" crossorigin href="/Mondrian-Simulator/assets/index-bnm3xFiU.css">
 </head>
 <body>
   <h1 class="sr-only">Mondrian Simulator — Generative Piet Mondrian Art Tool</h1>
@@ -119,6 +119,17 @@
       <span>Proportion <span class="tip-icon">ⓘ</span></span>
       <input type="range" id="proportional-bias" min="0" max="1" value="0.65" step="0.05" />
       <span id="proportional-bias-label">0.65</span>
+    </label>
+    <div class="settings-sep"></div>
+    <label class="control-group control-toggle" title="Draw a thick black frame around the entire canvas">
+      <span>Black Frame <span class="tip-icon">ⓘ</span></span>
+      <input type="checkbox" id="black-frame" class="toggle-input" />
+      <span class="toggle-switch"></span>
+    </label>
+    <label class="control-group control-toggle" title="Lines stop short of canvas edges, leaving small gaps. Click any line near the canvas edge to toggle that individual line.">
+      <span>Line Edge Gap <span class="tip-icon">ⓘ</span></span>
+      <input type="checkbox" id="line-edge-gap" class="toggle-input" checked />
+      <span class="toggle-switch"></span>
     </label>
   </div>
 

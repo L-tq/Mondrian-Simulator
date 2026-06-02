@@ -32,6 +32,10 @@ export interface MondrianParams {
   tJunctionRate: number;
   /** 0-1 bias toward aesthetically pleasing proportions (golden ratio, 2:3, etc.) vs random. */
   proportionalBias: number;
+  /** Whether to draw a black frame around the canvas. Default false. */
+  blackFrame: boolean;
+  /** Whether lines stop short of canvas edges (leaving small gaps). Default true. */
+  lineEdgeGap: boolean;
 }
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,9 +170,10 @@ function pickWeightedPosition(candidates: number[], minPos: number, maxPos: numb
  * Only original (pre-extension) line segments are considered for extension to avoid
  * cascading artifacts.
  */
-export function extendLines(grid: Grid<LifeColor>, rate: number, rng: RNG): void {
+export function extendLines(grid: Grid<LifeColor>, rate: number, rng: RNG, lineEdgeGap = false, edgeGapCells = 0): void {
   if (rate <= 0) return;
   const size = grid.rows;
+  const edgeStop = lineEdgeGap ? edgeGapCells : 0;
 
   // Snapshot original line cells so extensions don't cascade
   const original: boolean[][] = Array.from({ length: size }, (_, r) =>
@@ -186,17 +191,17 @@ export function extendLines(grid: Grid<LifeColor>, rate: number, rng: RNG): void
       if (c1 - c0 < 2) continue; // skip single-cell artifacts
 
       // Try extend left
-      if (c0 > 0 && grid.get(r, c0 - 1) !== 'line' && rng() < rate) {
+      if (c0 > edgeStop && grid.get(r, c0 - 1) !== 'line' && rng() < rate) {
         let ec = c0 - 1;
-        while (ec >= 0 && grid.get(r, ec) !== 'line') {
+        while (ec >= edgeStop && grid.get(r, ec) !== 'line') {
           grid.set(r, ec, 'line');
           ec--;
         }
       }
       // Try extend right
-      if (c1 < size && grid.get(r, c1) !== 'line' && rng() < rate) {
+      if (c1 < size - edgeStop && grid.get(r, c1) !== 'line' && rng() < rate) {
         let ec = c1;
-        while (ec < size && grid.get(r, ec) !== 'line') {
+        while (ec < size - edgeStop && grid.get(r, ec) !== 'line') {
           grid.set(r, ec, 'line');
           ec++;
         }
@@ -215,17 +220,17 @@ export function extendLines(grid: Grid<LifeColor>, rate: number, rng: RNG): void
       if (r1 - r0 < 2) continue; // skip single-cell artifacts
 
       // Try extend up
-      if (r0 > 0 && grid.get(r0 - 1, c) !== 'line' && rng() < rate) {
+      if (r0 > edgeStop && grid.get(r0 - 1, c) !== 'line' && rng() < rate) {
         let er = r0 - 1;
-        while (er >= 0 && grid.get(er, c) !== 'line') {
+        while (er >= edgeStop && grid.get(er, c) !== 'line') {
           grid.set(er, c, 'line');
           er--;
         }
       }
       // Try extend down
-      if (r1 < size && grid.get(r1, c) !== 'line' && rng() < rate) {
+      if (r1 < size - edgeStop && grid.get(r1, c) !== 'line' && rng() < rate) {
         let er = r1;
-        while (er < size && grid.get(er, c) !== 'line') {
+        while (er < size - edgeStop && grid.get(er, c) !== 'line') {
           grid.set(er, c, 'line');
           er++;
         }
@@ -281,6 +286,8 @@ export function stepMondrian(state: MondrianState): boolean {
   if (state.phase === 'coloring') return stepColoring(state);
   if (state.phase === 'balancing') return stepBalancing(state);
 
+  const size = state.grid.rows;
+
   if (state.rects.length >= state.params.targetRectCount) {
     return finishMondrian(state);
   }
@@ -335,8 +342,11 @@ export function stepMondrian(state: MondrianState): boolean {
         && thickOk;
       const thick = canThick ? 2 : 1;
 
+      const edgeGap = state.params.lineEdgeGap ? state.gap : 0;
+      const hStartC = rect.c === 0 ? edgeGap : rect.c;
+      const hEndC = rect.c + rect.w === size ? size - edgeGap : rect.c + rect.w;
       for (let t = 0; t < thick; t++) {
-        for (let c = rect.c; c < rect.c + rect.w; c++) {
+        for (let c = hStartC; c < hEndC; c++) {
           state.grid.set(lineR + t, c, 'line');
         }
       }
@@ -367,8 +377,11 @@ export function stepMondrian(state: MondrianState): boolean {
         && thickOk;
       const thick = canThick ? 2 : 1;
 
+      const edgeGap = state.params.lineEdgeGap ? state.gap : 0;
+      const vStartR = rect.r === 0 ? edgeGap : rect.r;
+      const vEndR = rect.r + rect.h === size ? size - edgeGap : rect.r + rect.h;
       for (let t = 0; t < thick; t++) {
-        for (let r = rect.r; r < rect.r + rect.h; r++) {
+        for (let r = vStartR; r < vEndR; r++) {
           state.grid.set(r, lineC + t, 'line');
         }
       }
@@ -556,7 +569,7 @@ function stepBalancing(state: MondrianState): boolean {
   }
 
   if (state.balanceTried >= MAX_BALANCE_ATTEMPTS) {
-    extendLines(grid, state.params.tJunctionRate, state.rng);
+    extendLines(grid, state.params.tJunctionRate, state.rng, state.params.lineEdgeGap, state.gap);
     state.phase = 'done';
     return false;
   }
@@ -852,6 +865,168 @@ export function mergeRegions(
   }
 
   return merged;
+}
+
+// ---------------------------------------------------------------------------
+// Line segment extraction & edge toggling
+// ---------------------------------------------------------------------------
+
+export interface LineSegment {
+  horizontal: boolean;
+  r0: number; c0: number;
+  r1: number; c1: number;
+}
+
+/** Extract all line segments from the grid by tracing contiguous line cells. */
+export function extractLineSegments(grid: Grid<LifeColor>): LineSegment[] {
+  const visited = new Set<number>();
+  const size = grid.rows;
+  const segments: LineSegment[] = [];
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const key = r * size + c;
+      if (visited.has(key)) continue;
+      if (grid.get(r, c) !== 'line') continue;
+
+      // Trace horizontally (both directions)
+      let c0 = c, c1 = c;
+      while (c0 - 1 >= 0 && grid.get(r, c0 - 1) === 'line') c0--;
+      while (c1 + 1 < size && grid.get(r, c1 + 1) === 'line') c1++;
+      // Trace vertically (both directions)
+      let r0 = r, r1 = r;
+      while (r0 - 1 >= 0 && grid.get(r0 - 1, c) === 'line') r0--;
+      while (r1 + 1 < size && grid.get(r1 + 1, c) === 'line') r1++;
+
+      const hLen = c1 - c0 + 1;
+      const vLen = r1 - r0 + 1;
+
+      // Pick the longer direction (prefer horizontal for ties)
+      if (hLen >= vLen) {
+        // Mark all cells in this horizontal span as visited
+        for (let cc = c0; cc <= c1; cc++) visited.add(r * size + cc);
+        if (hLen >= 2) {
+          segments.push({ horizontal: true, r0: r, c0, r1: r, c1 });
+        }
+      } else {
+        // Mark all cells in this vertical span as visited
+        for (let rr = r0; rr <= r1; rr++) visited.add(rr * size + c);
+        if (vLen >= 2) {
+          segments.push({ horizontal: false, r0, c0: c, r1, c1: c });
+        }
+      }
+
+      // Mark the starting cell
+      visited.add(key);
+    }
+  }
+
+  return segments;
+}
+
+/** Check if a line segment touches a canvas edge. */
+export function lineTouchesEdge(seg: LineSegment, size: number): { left: boolean; right: boolean; top: boolean; bottom: boolean } {
+  if (seg.horizontal) {
+    return {
+      left: seg.c0 === 0,
+      right: seg.c1 === size - 1,
+      top: false,
+      bottom: false,
+    };
+  } else {
+    return {
+      left: false,
+      right: false,
+      top: seg.r0 === 0,
+      bottom: seg.r1 === size - 1,
+    };
+  }
+}
+
+/**
+ * Toggle whether a line segment touches a given canvas edge.
+ * Returns true if a change was made.
+ */
+export function toggleLineEdgeTouch(
+  grid: Grid<LifeColor>,
+  seg: LineSegment,
+  edge: 'left' | 'right' | 'top' | 'bottom',
+  edgeGap: number,
+): boolean {
+  const size = grid.rows;
+
+  if (seg.horizontal && (edge === 'left' || edge === 'right')) {
+    if (edge === 'left' && seg.c0 <= edgeGap) {
+      if (seg.c0 === 0) {
+        // Currently touches — trim it
+        const adjColor = grid.get(seg.r0, edgeGap) === 'line' ? 'white' : (grid.get(seg.r0, edgeGap) as LifeColor);
+        for (let c = 0; c < edgeGap && c <= seg.c1; c++) {
+          if (grid.get(seg.r0, c) === 'line') grid.set(seg.r0, c, adjColor === 'line' ? 'white' : adjColor);
+        }
+        return true;
+      } else {
+        // Currently doesn't touch — extend it
+        for (let c = 0; c < seg.c0; c++) grid.set(seg.r0, c, 'line');
+        return true;
+      }
+    }
+    if (edge === 'right' && seg.c1 >= size - 1 - edgeGap) {
+      if (seg.c1 === size - 1) {
+        // Currently touches — trim it
+        const adjColor = grid.get(seg.r0, size - 1 - edgeGap) === 'line' ? 'white' : (grid.get(seg.r0, size - 1 - edgeGap) as LifeColor);
+        for (let c = size - edgeGap; c < size; c++) {
+          if (grid.get(seg.r0, c) === 'line') grid.set(seg.r0, c, adjColor === 'line' ? 'white' : adjColor);
+        }
+        return true;
+      } else {
+        // Currently doesn't touch — extend it
+        for (let c = seg.c1 + 1; c < size; c++) grid.set(seg.r0, c, 'line');
+        return true;
+      }
+    }
+  }
+
+  if (!seg.horizontal && (edge === 'top' || edge === 'bottom')) {
+    if (edge === 'top' && seg.r0 <= edgeGap) {
+      if (seg.r0 === 0) {
+        const adjColor = grid.get(edgeGap, seg.c0) === 'line' ? 'white' : (grid.get(edgeGap, seg.c0) as LifeColor);
+        for (let r = 0; r < edgeGap && r <= seg.r1; r++) {
+          if (grid.get(r, seg.c0) === 'line') grid.set(r, seg.c0, adjColor === 'line' ? 'white' : adjColor);
+        }
+        return true;
+      } else {
+        for (let r = 0; r < seg.r0; r++) grid.set(r, seg.c0, 'line');
+        return true;
+      }
+    }
+    if (edge === 'bottom' && seg.r1 >= size - 1 - edgeGap) {
+      if (seg.r1 === size - 1) {
+        const adjColor = grid.get(size - 1 - edgeGap, seg.c0) === 'line' ? 'white' : (grid.get(size - 1 - edgeGap, seg.c0) as LifeColor);
+        for (let r = size - edgeGap; r < size; r++) {
+          if (grid.get(r, seg.c0) === 'line') grid.set(r, seg.c0, adjColor === 'line' ? 'white' : adjColor);
+        }
+        return true;
+      } else {
+        for (let r = seg.r1 + 1; r < size; r++) grid.set(r, seg.c0, 'line');
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/** Find all line segments that contain cell (r,c). At intersections there may be two. */
+export function findLineSegmentsAt(segments: LineSegment[], r: number, c: number): LineSegment[] {
+  const found: LineSegment[] = [];
+  for (const seg of segments) {
+    if (seg.horizontal) {
+      if (seg.r0 === r && c >= seg.c0 && c <= seg.c1) found.push(seg);
+    } else {
+      if (seg.c0 === c && r >= seg.r0 && r <= seg.r1) found.push(seg);
+    }
+  }
+  return found;
 }
 
 // ---------------------------------------------------------------------------
