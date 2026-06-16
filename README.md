@@ -33,9 +33,9 @@ npm run dev      # http://localhost:5173
 
 | Parameter | Range | Default | Description |
 |-----------|-------|---------|-------------|
-| Grid | 12–200 | 50 | Grid resolution |
+| Grid | 12–200 | 100 | Grid resolution |
 | Speed | 1–10× | 4× | Animation playback speed |
-| Rects | 5–40 | 15 | Target number of rectangles |
+| Rects | 5–40 | 10 | Target number of rectangles |
 | Min Rect | 2–8 | 3 | Minimum rectangle dimension in cells |
 | Line Gap | 1–6 | 2 | Minimum gap between parallel lines |
 | Thick Line | 0–1 | 0 | Probability of drawing thicker black lines |
