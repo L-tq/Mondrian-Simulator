@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mondrian Simulator — Interactive Editor</title>
+  <meta name="description" content="Fine-tune Mondrian-style generative art with real-time editing. Recolor, split, merge rectangles and toggle line styles in this interactive abstract composition tool." />
+  <meta name="keywords" content="Mondrian, Piet Mondrian, generative art, procedural generation, abstract art, Mondrian generator, algorithmic composition" />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="Mondrian Simulator" />
+  <link rel="canonical" href="https://l-tq.github.io/Mondrian-Simulator/simulator.html" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://l-tq.github.io/Mondrian-Simulator/simulator.html" />
+  <meta property="og:title" content="Mondrian Simulator — Interactive Editor" />
+  <meta property="og:description" content="Fine-tune Mondrian-style generative art with real-time editing. Recolor, split, merge rectangles and toggle line styles." />
+  <meta property="og:site_name" content="Mondrian Simulator" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://l-tq.github.io/Mondrian-Simulator/simulator.html" />
+  <meta name="twitter:title" content="Mondrian Simulator — Interactive Editor" />
+  <meta name="twitter:description" content="Fine-tune Mondrian-style generative art with real-time editing. Recolor, split, merge rectangles and toggle line styles." />
+
+  <link rel="icon" type="image/x-icon" href="/favicon/favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon/favicon-96x96.png" />
+  <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png" />
+  <link rel="manifest" href="/favicon/site.webmanifest" />
+  <meta name="theme-color" content="#141414" />
+  <meta property="og:image" content="https://l-tq.github.io/Mondrian-Simulator/OG%20image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://l-tq.github.io/Mondrian-Simulator/OG%20image.png" />
+  <link rel="stylesheet" href="/src/style.css" />
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Mondrian Simulator",
+    "description": "An interactive generative art tool that creates Piet Mondrian-style compositions using recursive subdivision and strategic color assignment.",
+    "url": "https://l-tq.github.io/Mondrian-Simulator/simulator.html",
+    "applicationCategory": "Multimedia",
+    "operatingSystem": "Web Browser",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+</head>
+<body>
+  <h1 class="sr-only">Mondrian Simulator — Generative Piet Mondrian Art Tool</h1>
+  <noscript>
+    <div style="padding: 2rem; font-family: sans-serif; text-align: center;">
+      <h2>Mondrian Simulator</h2>
+      <p>This interactive tool generates Piet Mondrian-style abstract compositions using recursive subdivision and strategic color balancing. Please enable JavaScript to use the generator.</p>
+    </div>
+  </noscript>
+
+  <a id="back-link" href="./" title="Back to Home">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  </a>
+
+  <a id="github-link" href="https://github.com/L-tq/Mondrian-Simulator" target="_blank" rel="noopener" title="View on GitHub">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/>
+    </svg>
+  </a>
+
+  <div id="pixi-container"></div>
+
+  <div id="controls">
+    <button id="btn-generate" title="Generate">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+      </svg>
+    </button>
+    <button id="btn-pause" title="Pause">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="4" width="4" height="16" />
+        <rect x="14" y="4" width="4" height="16" />
+      </svg>
+    </button>
+    <button id="btn-settings" title="Settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    </button>
+  </div>
+
+  <div id="settings-dropdown" class="hidden">
+    <label class="control-group">
+      <span>Grid</span>
+      <input type="range" id="grid-size" min="12" max="200" value="100" step="1" />
+      <span id="grid-size-label">100</span>
+    </label>
+    <label class="control-group">
+      <span>Speed</span>
+      <input type="range" id="playback-speed" min="1" max="10" value="4" step="1" />
+      <span id="playback-speed-label">4×</span>
+    </label>
+    <label class="control-group">
+      <span>Rects</span>
+      <input type="range" id="rect-count" min="5" max="40" value="10" step="1" />
+      <span id="rect-count-label">10</span>
+    </label>
+    <div class="settings-sep"></div>
+    <label class="control-group" title="Minimum rectangle dimension in cells">
+      <span>Min Rect <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="min-rect-size" min="2" max="8" value="3" step="1" />
+      <span id="min-rect-size-label">3</span>
+    </label>
+    <label class="control-group" title="Minimum gap in cells between parallel lines">
+      <span>Line Gap <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="line-gap" min="1" max="6" value="2" step="1" />
+      <span id="line-gap-label">2</span>
+    </label>
+    <label class="control-group" title="Probability of drawing thicker black lines">
+      <span>Thick Line <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="line-thick-chance" min="0" max="1" value="0" step="0.05" />
+      <span id="line-thick-chance-label">0</span>
+    </label>
+    <label class="control-group" title="Thickness of regular lines in cells">
+      <span>Line Width <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="line-width" min="1" max="5" value="1" step="1" />
+      <span id="line-width-label">1</span>
+    </label>
+    <label class="control-group" title="Thickness of thick lines in cells">
+      <span>Thick Width <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="thick-width" min="1" max="5" value="2" step="1" />
+      <span id="thick-width-label">2</span>
+    </label>
+    <label class="control-group" title="How aggressively lines extend into adjacent rectangles to form T-junctions">
+      <span>T-Junction <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="tj-junction-rate" min="0" max="1" value="0.45" step="0.05" />
+      <span id="tj-junction-rate-label">0.45</span>
+    </label>
+    <label class="control-group" title="Bias toward aesthetically pleasing proportions (golden ratio, 2:3, etc.)">
+      <span>Proportion <span class="tip-icon">ⓘ</span></span>
+      <input type="range" id="proportional-bias" min="0" max="1" value="0.65" step="0.05" />
+      <span id="proportional-bias-label">0.65</span>
+    </label>
+    <div class="settings-sep"></div>
+    <label class="control-group" title="Draw a thick black frame around the entire composition">
+      <span>Black Frame</span>
+      <input type="checkbox" id="black-frame" class="toggle-input" />
+      <span class="control-toggle toggle-switch"></span>
+    </label>
+    <label class="control-group" title="Allow lines to stop short of canvas edges, creating small gaps">
+      <span>Line Edge Gap</span>
+      <input type="checkbox" id="line-edge-gap" class="toggle-input" />
+      <span class="control-toggle toggle-switch"></span>
+    </label>
+  </div>
+
+  <div id="step-indicator" class="step-hidden">Ready</div>
+
+  <div id="toast" class="toast-hidden"></div>
+
+  <div id="edit-toolbar" class="hidden">
+    <span class="toolbar-label">Region</span>
+    <button class="swatch swatch-red" data-color="red" title="Red (R)"></button>
+    <button class="swatch swatch-blue" data-color="blue" title="Blue (B)"></button>
+    <button class="swatch swatch-yellow" data-color="yellow" title="Yellow (Y)"></button>
+    <button class="swatch swatch-white" data-color="white" title="White (W)"></button>
+    <button class="swatch swatch-black" data-color="black" title="Black (K)"></button>
+    <span class="toolbar-sep"></span>
+    <button class="toolbar-btn" id="btn-split-h" title="Split Horizontal (H)">⬌</button>
+    <button class="toolbar-btn" id="btn-split-v" title="Split Vertical (V)">⬍</button>
+    <button class="toolbar-btn" id="btn-merge" title="Merge (M)">⊕</button>
+    <button class="toolbar-btn toolbar-delete" id="btn-delete" title="Delete (Del)">✕</button>
+    <span class="toolbar-sep"></span>
+    <span class="toolbar-label">Line</span>
+    <button class="toolbar-btn" id="btn-toggle-thickness" title="Toggle Thickness (T)">⬡</button>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

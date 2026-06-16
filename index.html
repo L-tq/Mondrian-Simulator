@@ -23,7 +23,18 @@
   <meta name="twitter:title" content="Mondrian Simulator — Generative Piet Mondrian Art" />
   <meta name="twitter:description" content="Create Piet Mondrian-style compositions with recursive subdivision and strategic color balancing. Click to edit, split, and recolor rectangles." />
 
-  <link rel="stylesheet" href="/src/style.css" />
+  <link rel="icon" type="image/x-icon" href="/favicon/favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon/favicon-96x96.png" />
+  <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png" />
+  <link rel="manifest" href="/favicon/site.webmanifest" />
+  <meta name="theme-color" content="#141414" />
+  <meta property="og:image" content="https://l-tq.github.io/Mondrian-Simulator/OG%20image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://l-tq.github.io/Mondrian-Simulator/OG%20image.png" />
+  <link rel="stylesheet" href="/src/landing/style.css" />
 
   <!-- Structured data -->
   <script type="application/ld+json">
@@ -40,13 +51,6 @@
   </script>
 </head>
 <body>
-  <h1 class="sr-only">Mondrian Simulator — Generative Piet Mondrian Art Tool</h1>
-  <noscript>
-    <div style="padding: 2rem; font-family: sans-serif; text-align: center;">
-      <h2>Mondrian Simulator</h2>
-      <p>This interactive tool generates Piet Mondrian-style abstract compositions using recursive subdivision and strategic color balancing. Please enable JavaScript to use the generator.</p>
-    </div>
-  </noscript>
 
   <a id="github-link" href="https://github.com/L-tq/Mondrian-Simulator" target="_blank" rel="noopener" title="View on GitHub">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -54,115 +58,190 @@
     </svg>
   </a>
 
-  <div id="pixi-container"></div>
+  <main>
+    <!-- ================================================================= -->
+    <!-- Hero                                                               -->
+    <!-- ================================================================= -->
+    <section id="hero">
+    <div id="hero-mondrian" aria-hidden="true"></div>
+    <div id="hero-content">
+      <h1 class="hero-title">
+        <span class="hero-title-line"><span class="hero-title-char">M</span><span class="hero-title-char">o</span><span class="hero-title-char">n</span><span class="hero-title-char">d</span><span class="hero-title-char">r</span><span class="hero-title-char">i</span><span class="hero-title-char">a</span><span class="hero-title-char">n</span></span>
+        <span class="hero-title-line"><span class="hero-title-char">S</span><span class="hero-title-char">i</span><span class="hero-title-char">m</span><span class="hero-title-char">u</span><span class="hero-title-char">l</span><span class="hero-title-char">a</span><span class="hero-title-char">t</span><span class="hero-title-char">o</span><span class="hero-title-char">r</span></span>
+      </h1>
+      <p class="hero-subtitle">Create generative compositions in the style of Piet Mondrian</p>
+      <div class="hero-actions">
+        <a href="simulator.html" class="btn btn-primary" id="cta-enter">Launch Simulator</a>
+        <a href="#how-it-works" class="btn btn-secondary">How It Works</a>
+      </div>
+    </div>
+  </section>
 
-  <div id="controls">
-    <button id="btn-generate" title="Generate">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10" />
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-      </svg>
-    </button>
-    <button id="btn-pause" title="Pause">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="6" y="4" width="4" height="16" />
-        <rect x="14" y="4" width="4" height="16" />
-      </svg>
-    </button>
-    <button id="btn-settings" title="Settings">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    </button>
-  </div>
+  <div class="section-divider" aria-hidden="true"></div>
 
-  <div id="settings-dropdown" class="hidden">
-    <label class="control-group">
-      <span>Grid</span>
-      <input type="range" id="grid-size" min="12" max="200" value="50" step="1" />
-      <span id="grid-size-label">50</span>
-    </label>
-    <label class="control-group">
-      <span>Speed</span>
-      <input type="range" id="playback-speed" min="1" max="10" value="4" step="1" />
-      <span id="playback-speed-label">4×</span>
-    </label>
-    <label class="control-group">
-      <span>Rects</span>
-      <input type="range" id="rect-count" min="5" max="40" value="15" step="1" />
-      <span id="rect-count-label">15</span>
-    </label>
-    <div class="settings-sep"></div>
-    <label class="control-group" title="Minimum rectangle dimension in cells">
-      <span>Min Rect <span class="tip-icon">ⓘ</span></span>
-      <input type="range" id="min-rect-size" min="2" max="8" value="3" step="1" />
-      <span id="min-rect-size-label">3</span>
-    </label>
-    <label class="control-group" title="Minimum gap in cells between parallel lines">
-      <span>Line Gap <span class="tip-icon">ⓘ</span></span>
-      <input type="range" id="line-gap" min="1" max="6" value="2" step="1" />
-      <span id="line-gap-label">2</span>
-    </label>
-    <label class="control-group" title="Probability of drawing thicker black lines">
-      <span>Thick Line <span class="tip-icon">ⓘ</span></span>
-      <input type="range" id="line-thick-chance" min="0" max="1" value="0" step="0.05" />
-      <span id="line-thick-chance-label">0</span>
-    </label>
-    <label class="control-group" title="Thickness of regular lines in cells">
-      <span>Line Width <span class="tip-icon">ⓘ</span></span>
-      <input type="range" id="line-width" min="1" max="5" value="1" step="1" />
-      <span id="line-width-label">1</span>
-    </label>
-    <label class="control-group" title="Thickness of thick lines in cells">
-      <span>Thick Width <span class="tip-icon">ⓘ</span></span>
-      <input type="range" id="thick-width" min="1" max="5" value="2" step="1" />
-      <span id="thick-width-label">2</span>
-    </label>
-    <label class="control-group" title="How aggressively lines extend into adjacent rectangles to form T-junctions">
-      <span>T-Junction <span class="tip-icon">ⓘ</span></span>
-      <input type="range" id="tj-junction-rate" min="0" max="1" value="0.45" step="0.05" />
-      <span id="tj-junction-rate-label">0.45</span>
-    </label>
-    <label class="control-group" title="Bias toward aesthetically pleasing proportions — golden ratio, 2:3, 3:5, etc. (0 = random, 1 = strict)">
-      <span>Proportion <span class="tip-icon">ⓘ</span></span>
-      <input type="range" id="proportional-bias" min="0" max="1" value="0.65" step="0.05" />
-      <span id="proportional-bias-label">0.65</span>
-    </label>
-    <div class="settings-sep"></div>
-    <label class="control-group control-toggle" title="Draw a thick black frame around the entire canvas">
-      <span>Black Frame <span class="tip-icon">ⓘ</span></span>
-      <input type="checkbox" id="black-frame" class="toggle-input" />
-      <span class="toggle-switch"></span>
-    </label>
-    <label class="control-group control-toggle" title="Lines stop short of canvas edges, leaving small gaps. Click any line near the canvas edge to toggle that individual line.">
-      <span>Line Edge Gap <span class="tip-icon">ⓘ</span></span>
-      <input type="checkbox" id="line-edge-gap" class="toggle-input" checked />
-      <span class="toggle-switch"></span>
-    </label>
-  </div>
+  <!-- ================================================================= -->
+  <!-- About                                                              -->
+  <!-- ================================================================= -->
+  <section id="about">
+    <div class="section-container">
+      <h2 class="section-title">The Art of De Stijl</h2>
+      <div class="about-layout">
+        <div class="about-text">
+          <p>Piet Mondrian was a Dutch painter and a pioneer of abstract art. His iconic compositions reduce visual language to its purest elements: <strong>horizontal and vertical black lines</strong> intersecting on a white canvas, punctuated by <strong>primary colors</strong> — red, blue, and yellow.</p>
+          <p>This simulator recreates that spirit algorithmically, using recursive subdivision and visual weight balancing to generate unique Mondrian-style compositions at the click of a button.</p>
+        </div>
+        <div class="about-palette">
+          <div class="palette-swatch" data-color="red"><span>Red</span></div>
+          <div class="palette-swatch" data-color="blue"><span>Blue</span></div>
+          <div class="palette-swatch" data-color="yellow"><span>Yellow</span></div>
+          <div class="palette-swatch" data-color="black"><span>Black</span></div>
+          <div class="palette-swatch" data-color="white"><span>White</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <div id="step-indicator" class="step-hidden"></div>
+  <div class="section-divider" aria-hidden="true"></div>
 
-  <div id="toast" class="toast-hidden"></div>
+  <!-- ================================================================= -->
+  <!-- How It Works                                                       -->
+  <!-- ================================================================= -->
+  <section id="how-it-works">
+    <div class="section-container">
+      <h2 class="section-title">How It Works</h2>
+      <div class="steps-grid">
+        <div class="step-card" data-step="1">
+          <span class="step-number">01</span>
+          <h3>Split</h3>
+          <p>The algorithm starts with a single rectangle and recursively subdivides it. Lines are placed with a bias toward aesthetically pleasing proportions like the golden ratio and 2:3.</p>
+        </div>
+        <div class="step-card" data-step="2">
+          <span class="step-number">02</span>
+          <h3>Color</h3>
+          <p>Colors are assigned strategically — red to the largest rectangles, blue and yellow to edge-adjacent spaces, and a rare black accent for contrast. Most rectangles remain white.</p>
+        </div>
+        <div class="step-card" data-step="3">
+          <span class="step-number">03</span>
+          <h3>Balance</h3>
+          <p>Colors are swapped iteratively to pull the visual center of mass toward the geometric center, creating the harmonious tension characteristic of Mondrian's work.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <div id="edit-toolbar" class="hidden">
-    <span class="toolbar-label toolbar-region">Edit</span>
-    <button id="btn-color-red" class="swatch swatch-red toolbar-region" title="Red (R)"></button>
-    <button id="btn-color-blue" class="swatch swatch-blue toolbar-region" title="Blue (B)"></button>
-    <button id="btn-color-yellow" class="swatch swatch-yellow toolbar-region" title="Yellow (Y)"></button>
-    <button id="btn-color-white" class="swatch swatch-white toolbar-region" title="White (W)"></button>
-    <button id="btn-color-black" class="swatch swatch-black toolbar-region" title="Black (K)"></button>
-    <span class="toolbar-sep toolbar-region"></span>
-    <button id="btn-split-h" class="toolbar-btn toolbar-region" title="Split Horizontal (H)">⬌</button>
-    <button id="btn-split-v" class="toolbar-btn toolbar-region" title="Split Vertical (V)">⬍</button>
-    <button id="btn-merge" class="toolbar-btn toolbar-region" title="Merge (Shift+click then M)">⊕</button>
-    <button id="btn-delete" class="toolbar-btn toolbar-delete toolbar-region" title="Delete (Del)">✕</button>
-    <span class="toolbar-sep toolbar-line-only"></span>
-    <span class="toolbar-label toolbar-line-only">Line</span>
-    <button id="btn-toggle-thickness" class="toolbar-btn toolbar-line-only" title="Toggle Line Thickness (T)">⬡</button>
-  </div>
+  <div class="section-divider" aria-hidden="true"></div>
 
-  <script type="module" src="/src/main.ts"></script>
+  <!-- ================================================================= -->
+  <!-- Features                                                           -->
+  <!-- ================================================================= -->
+  <section id="features">
+    <div class="section-container">
+      <h2 class="section-title">Interactive Editing</h2>
+      <div class="features-grid">
+        <div class="feature-item">
+          <div class="feature-icon" aria-hidden="true">&#9678;</div>
+          <h3>Recolor Regions</h3>
+          <p>Click any colored rectangle and choose from red, blue, yellow, white, or black to recolor it instantly.</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon" aria-hidden="true">&#8644;</div>
+          <h3>Split &amp; Merge</h3>
+          <p>Split a region horizontally or vertically, or merge two adjacent regions with Shift+click.</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon" aria-hidden="true">&#9640;</div>
+          <h3>Toggle Lines</h3>
+          <p>Click lines near canvas edges to toggle edge gaps, or press T to switch between regular and thick lines.</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon" aria-hidden="true">&#9881;</div>
+          <h3>Fine-Tune Settings</h3>
+          <p>Adjust grid size, rectangle count, line thickness, T-junction rate, proportional bias, and more.</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon" aria-hidden="true">&#9654;</div>
+          <h3>Step-by-Step Build</h3>
+          <p>Watch the algorithm unfold with the step-through animation — see splitting, coloring, and balancing in action.</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon" aria-hidden="true">&#9000;</div>
+          <h3>Keyboard Shortcuts</h3>
+          <p>Press R/B/Y/W/K to recolor, H/V to split, M to merge, Del to clear, and Escape to deselect. Click Generate or use the step-by-step animation to create new compositions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- ================================================================= -->
+  <!-- Guide                                                              -->
+  <!-- ================================================================= -->
+  <section id="guide">
+    <div class="section-container">
+      <h2 class="section-title">How to Use the Simulator</h2>
+      <div class="guide-steps">
+        <div class="guide-step" data-guide-step="1">
+          <div class="guide-step-num">1</div>
+          <div class="guide-step-content">
+            <h3>Generate a Composition</h3>
+            <p>Click the Generate button to create a new Mondrian-style composition instantly, or use the step-by-step animation to watch the algorithm build it piece by piece.</p>
+          </div>
+        </div>
+        <div class="guide-step" data-guide-step="2">
+          <div class="guide-step-num">2</div>
+          <div class="guide-step-content">
+            <h3>Adjust the Settings</h3>
+            <p>Open the settings panel to tweak the <strong>Grid</strong> size (12–200 cells), <strong>Rect</strong> count (5–40), <strong>Line Gap</strong>, <strong>Line Width</strong>, <strong>T-Junction</strong> rate, and <strong>Proportional Bias</strong> to get the exact look you want.</p>
+          </div>
+        </div>
+        <div class="guide-step" data-guide-step="3">
+          <div class="guide-step-num">3</div>
+          <div class="guide-step-content">
+            <h3>Click to Edit Regions</h3>
+            <p>Click any colored rectangle to select it, then pick a new color from the toolbar or press <span class="shortcut-key">R</span> <span class="shortcut-key">B</span> <span class="shortcut-key">Y</span> <span class="shortcut-key">W</span> <span class="shortcut-key">K</span> to recolor.</p>
+          </div>
+        </div>
+        <div class="guide-step" data-guide-step="4">
+          <div class="guide-step-num">4</div>
+          <div class="guide-step-content">
+            <h3>Split and Merge</h3>
+            <p>Press <span class="shortcut-key">H</span> to split a region horizontally or <span class="shortcut-key">V</span> to split vertically. Hold <span class="shortcut-key">Shift</span> and click two regions, then press <span class="shortcut-key">M</span> to merge them together.</p>
+          </div>
+        </div>
+        <div class="guide-step" data-guide-step="5">
+          <div class="guide-step-num">5</div>
+          <div class="guide-step-content">
+            <h3>Toggle Line Styles</h3>
+            <p>Click a line near the canvas edge to create edge gaps, or select a line and press <span class="shortcut-key">T</span> to switch between regular and thick line styles for added visual weight.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <!-- CTA Banner                                                         -->
+  <!-- ================================================================= -->
+  <section id="cta-banner">
+    <h2 class="section-title">Ready to Create?</h2>
+    <p>Open the simulator and start generating your own Mondrian-inspired compositions. Every composition is unique.</p>
+    <a href="simulator.html" class="btn btn-primary">Launch Simulator</a>
+  </section>
+
+  </main>
+
+  <!-- ================================================================= -->
+  <!-- Footer                                                             -->
+  <!-- ================================================================= -->
+  <footer id="footer">
+    <div class="footer-inner">
+      <a href="https://github.com/L-tq/Mondrian-Simulator" target="_blank" rel="noopener">View on GitHub</a>
+      <span class="footer-sep">&middot;</span>
+      <span>Built with TypeScript, PixiJS &amp; GSAP</span>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/landing/main.ts"></script>
 </body>
 </html>

@@ -27,6 +27,33 @@ html, body {
   border: 0;
 }
 
+#back-link {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(12px);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  z-index: 10;
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+
+#back-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+#back-link:active {
+  transform: scale(0.92);
+}
+
 #github-link {
   position: fixed;
   top: 16px;

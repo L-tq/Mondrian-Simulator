@@ -91,10 +91,10 @@ function loadSettings(): Settings | null {
 function applySettings(s: Settings): void {
   sliderGrid.value = String(s.gridSize);
   sliderSpeed.value = String(s.speed);
-  sliderRectCount.value = String(s.rectCount ?? 15);
+  sliderRectCount.value = String(s.rectCount ?? 10);
   gridLabel.textContent = String(s.gridSize);
   speedLabel.textContent = s.speed + '×';
-  rectCountLabel.textContent = String(s.rectCount ?? 15);
+  rectCountLabel.textContent = String(s.rectCount ?? 10);
   sliderMinRectSize.value = String(s.minRectSize ?? 3);
   minRectSizeLabel.textContent = String(s.minRectSize ?? 3);
   sliderLineGap.value = String(s.lineGap ?? 2);
@@ -117,12 +117,12 @@ const saved = loadSettings();
 if (saved) {
   applySettings(saved);
 } else {
-  sliderGrid.value = '50';
+  sliderGrid.value = '100';
   sliderSpeed.value = '4';
-  sliderRectCount.value = '15';
-  gridLabel.textContent = '50';
+  sliderRectCount.value = '10';
+  gridLabel.textContent = '100';
   speedLabel.textContent = '4×';
-  rectCountLabel.textContent = '15';
+  rectCountLabel.textContent = '10';
   sliderMinRectSize.value = '3';
   sliderLineGap.value = '2';
   sliderLineThickChance.value = '0';
@@ -626,13 +626,6 @@ async function init(): Promise<void> {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && e.target === document.body) {
-      e.preventDefault();
-      isPlaying = false;
-      if (animTimer !== null) { clearTimeout(animTimer); animTimer = null; }
-      setPauseIcon(false);
-      generateOneShot();
-    }
     // Keyboard shortcuts for editing
     if (selectedIdx >= 0) {
       if (e.key === 'r') changeSelectedColor('red');
